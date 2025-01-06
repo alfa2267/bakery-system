@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, Body
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
@@ -12,7 +12,7 @@ from typing import List, Optional, Dict
 
 from .models import (
     Order, 
-    OrderItem,  # Add this line
+    OrderItem,
     ValidationResponse, 
     ScheduleResponse,
     DailyScheduleSummary, 
@@ -23,8 +23,6 @@ from .models import (
     ProductionStep, 
     Ingredient
 )
-
-
 
 from .scheduler import BakeryScheduler
 from .config import settings
@@ -200,10 +198,6 @@ async def get_orders(db: Session = Depends(get_db)):
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching the orders")
 
-
-
-
-
 @app.get("/schedule/{date}")
 async def get_schedule(
     date: str, 
@@ -320,12 +314,124 @@ async def get_available_recipes():
             detail=f"Could not fetch recipes: {str(e)}"
         )
 
-@app.get("/baker/{baker_name}")
-async def get_items_for_baker(baker_name: str):
-    """Endpoint to retrieve all items associated with a specific baker"""
+
+
+
+@app.get("/resources")
+async def get_available_resources(
+    date: Optional[str] = Query(None, description="Date to check resources availability"),
+    filter_name: Optional[str] = Query(None, description="Specific staff or equipment to filter"),
+    filter_type: Optional[str] = Query(None, description="Type of resource to filter (staff/equipment)"),
+    db: Session = Depends(get_db)
+):
+    """Endpoint to retrieve available resources"""
     try:
-        items = scheduler.get_items_for_baker(baker_name)
-        return {"baker": baker_name, "items": items}
+        # If no date provided, use current date
+        if not date:
+            date = datetime.now().strftime("%Y-%m-%d")
+        
+        # Pass repository to scheduler to enable resource retrieval
+        repository = OrderRepository(db)
+        scheduler_with_repo = BakeryScheduler(repository=repository)
+        
+        # Get available resources
+        resources = scheduler_with_repo.get_available_resources(date)
+        
+        # Apply filtering if specified
+        if filter_name and filter_type:
+            if filter_type == 'staff':
+                resources['staff'] = [
+                    staff for staff in resources['staff'] 
+                    if staff['name'].lower() == filter_name.lower()
+                ]
+            elif filter_type == 'equipment':
+                resources['equipment'] = [
+                    equipment for equipment in resources['equipment']
+                    if equipment['name'].lower() == filter_name.lower()
+                ]
+        
+        # If a specific task retrieval is needed
+        if filter_name:
+            try:
+                task_resources = scheduler_with_repo.get_resources_for_task(filter_name, date)
+                resources['task_resources'] = task_resources
+            except Exception as task_error:
+                logger.warning(f"Could not retrieve task resources: {str(task_error)}")
+        
+        return resources
     except Exception as e:
-        logger.error(f"Error fetching baker items: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching items for the baker")
+        logger.error(f"Error fetching available resources: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching available resources")
+
+
+
+
+
+
+
+@app.patch("/resources/tasks/{task_id}/status")
+async def update_task_status(
+    task_id: str, 
+    status: str = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Endpoint to update the status of a specific task"""
+    try:
+        logger.info(f"Updating task {task_id} to status {status}")
+        
+        repository = OrderRepository(db)
+        
+        # Update task status
+        updated_task = repository.update_task_status(task_id, status)
+        
+        # Transform task to match frontend expectations
+        task_response = {
+            "id": str(updated_task.id),
+            "time": updated_task.start_time.isoformat(),
+            "action": updated_task.step,
+            "details": f"{updated_task.step} for Order {updated_task.order_id}",
+            "equipment": updated_task.resources,
+            "status": updated_task.status,
+            "dependencies": []
+        }
+        
+        return task_response
+        
+    except SQLAlchemyError as db_error:
+        logger.error(f"Database error updating task status: {str(db_error)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
+    except Exception as unexpected_error:
+        logger.error(f"Unexpected error updating task status: {str(unexpected_error)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while updating task status")
+    """Endpoint to update the status of a specific task"""
+    try:
+        logger.info(f"Updating task {task_id} for baker {baker_name} to status {status}")
+        
+        repository = OrderRepository(db)
+        
+        # Update task status
+        updated_task = repository.update_task_status(task_id, status)
+        
+        # Transform task to match frontend expectations
+        task_response = {
+            "id": str(updated_task.id),
+            "time": updated_task.start_time.isoformat(),
+            "action": updated_task.step,
+            "details": f"{updated_task.step} for Order {updated_task.order_id}",
+            "equipment": updated_task.resources,
+            "status": updated_task.status,
+            "dependencies": []
+        }
+        
+        return task_response
+        
+    except SQLAlchemyError as db_error:
+        logger.error(f"Database error updating task status: {str(db_error)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
+    except Exception as unexpected_error:
+        logger.error(f"Unexpected error updating task status: {str(unexpected_error)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while updating task status")

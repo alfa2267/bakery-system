@@ -19,10 +19,11 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
         setIsLoading(true);
         setError(null);
         
-        const response = await bakeryApi.getBakerTasks(selectedDate, selectedBaker);
+        const response = await bakeryApi.getResources(selectedDate, selectedBaker);
         
+        console.log(response?)
         // Ensure tasks is an array, default to empty array if undefined
-        const tasksData = response?.tasks || [];
+        const tasksData = response?.task_resources. || [];
         
         setBakerTasks(tasksData);
       } catch (err) {

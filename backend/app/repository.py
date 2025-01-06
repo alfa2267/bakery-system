@@ -118,6 +118,31 @@ class OrderRepository:
             logger.error("Error creating order with ID %s: %s", order.id, str(e))
             raise HTTPException(status_code=500, detail="Database error occurred while creating the order.")
 
+    def update_task_status(self, task_id: str, new_status: str) -> models.ScheduledTaskDB:
+        """Update the status of a specific task"""
+        logger.info(f"Updating task {task_id} to status {new_status}")
+        
+        try:
+            # Find the task
+            task = self.db.query(models.ScheduledTaskDB).filter(models.ScheduledTaskDB.id == task_id).first()
+            
+            if not task:
+                logger.error(f"Task {task_id} not found")
+                raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+            
+            # Update status
+            task.status = new_status
+            
+            self.db.commit()
+            self.db.refresh(task)
+            logger.info(f"Task {task_id} status updated to {new_status}")
+            return task
+        
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.error(f"Error updating task status: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error updating task status")
+
     def get_order(self, order_id: str) -> Optional[models.OrderDB]:
         """Fetch a specific order by its ID"""
         logger.info("Fetching order with ID: %s", order_id)

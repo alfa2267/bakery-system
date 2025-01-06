@@ -3,7 +3,7 @@ import {
   ValidationResponse, 
   ScheduledTask,
   BakerTask,
-  transformScheduledTask,
+  //transformScheduledTask,
   Recipe
 } from '../types';
 
@@ -56,7 +56,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   }
   try {
     const data = await response.json();
-    console.log('API Response:', data); // Debug log
+    //('API Response:', data); // Debug log
     return data;
   } catch (error) {
     console.error('Error parsing response:', error);
@@ -144,7 +144,7 @@ export const bakeryApi = {
 
       // Parse the response manually
       const result = JSON.parse(rawResponse);
-      console.log('Parsed orders result:', result);
+     // console.log('Parsed orders result:', result);
 
       // Validate the response structure
       if (!result.orders || !Array.isArray(result.orders)) {
@@ -188,32 +188,46 @@ export const bakeryApi = {
     return handleResponse<ConfigResponse>(response);
   },
 
-  getBakerTasks: async (date: string, baker: string): Promise<{ tasks: BakerTask[] }> => {
-    const response = await fetch(`${API_BASE_URL}/baker/${baker}?date=${date}`);
-    const result = await handleResponse<{ tasks: any[] }>(response);
-    return {
-      tasks: result.tasks.map(task => ({
-        id: task.id,
-        time: new Date(task.time),
-        action: task.action,
-        details: task.details,
-        equipment: task.equipment,
-        status: task.status,
-        dependencies: task.dependencies?.map((dep: any) => ({
-          from: dep.from,
-          what: dep.what,
-          urgent: dep.urgent
-        }))
-      }))
-    };
+ 
+
+  getResources: async (
+    date?: string, 
+    filterName?: string, 
+    filterType?: 'staff' | 'equipment'
+  ): Promise<{
+    staff: any[];
+    equipment: any[];
+    task_resources?: any[];
+  }> => {
+    const url = new URL(`${API_BASE_URL}/resources`);
+    if (date) url.searchParams.append('date', date);
+    if (filterName) url.searchParams.append('filter_name', filterName);
+    if (filterType) url.searchParams.append('filter_type', filterType);
+  
+    try {
+      const response = await fetch(url.toString());
+      const result = await handleResponse<{
+        staff: any[];
+        equipment: any[];
+        task_resources?: any[];
+      }>(response);
+  
+     // console.log('Resources response:', result);
+  
+      return result;
+    } catch (error) {
+      console.error('Error fetching resources:', error);
+      throw error;
+    }
   },
 
+
+
   updateTaskStatus: async (
-    baker: string,
     taskId: string,
     status: BakerTask['status']
   ): Promise<BakerTask> => {
-    const response = await fetch(`${API_BASE_URL}/baker/${baker}/tasks/${taskId}/status`, {
+    const response = await fetch(`${API_BASE_URL}/resources/tasks/${taskId}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -222,22 +236,24 @@ export const bakeryApi = {
     return result;
   },
 
+  
+
   getAvailableRecipes: async (): Promise<Recipe[]> => {
     try {
       const response = await fetch(`${API_BASE_URL}/recipes`);
       const data = await handleResponse<RecipesResponse>(response);
       
-      console.log(data.recipes)
+     // console.log(data.recipes)
 
       // Check if we have recipes array and return it
       if (data && Array.isArray(data.recipes)) {
-        console.log('Recipes fetched:', data.recipes);
+      //  console.log('Recipes fetched:', data.recipes);
         return data.recipes;
       }
       
       // If data is an array directly (fallback)
       if (Array.isArray(data)) {
-        console.log('Recipes fetched (direct array):', data);
+     //   console.log('Recipes fetched (direct array):', data);
         return data;
       }
       

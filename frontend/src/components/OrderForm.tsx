@@ -42,7 +42,7 @@ const OrderForm: React.FC = () => {
       setIsLoading(true);
       try {
         const response = await bakeryApi.getAvailableRecipes();
-        console.log('Raw API response:', response); // Debug log
+      //  console.log('Raw API response:', response); // Debug log
         
         // Ensure we have an array of recipes
         if (!response || !Array.isArray(response)) {
@@ -50,13 +50,13 @@ const OrderForm: React.FC = () => {
           throw new Error('Invalid recipes data received');
         }
 
-        console.log('Number of recipes received:', response.length); // Debug log
+     //   console.log('Number of recipes received:', response.length); // Debug log
         
         setRecipesData(response);
         
         // Set default items based on fetched recipes
         const defaultItems: OrderItem[] = response.map((recipe: Recipe) => {
-          console.log('Creating default item for recipe:', recipe.product.name); // Debug individual recipes
+       //   console.log('Creating default item for recipe:', recipe.product.name); // Debug individual recipes
           return {
             product: {
               id: recipe.product.id,
@@ -66,11 +66,11 @@ const OrderForm: React.FC = () => {
           };
         });
 
-        console.log('Default items created:', defaultItems); // Debug log
+      //  console.log('Default items created:', defaultItems); // Debug log
 
         setFormData(prevData => {
           const newData = { ...prevData, items: defaultItems };
-          console.log('Updated form data:', newData); // Debug log
+       //   console.log('Updated form data:', newData); // Debug log
           return newData;
         });
       } catch (error) {
