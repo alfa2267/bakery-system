@@ -7,7 +7,16 @@ import {
   transformScheduledTask
 } from '../types';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = (() => {
+  // If running in Codespaces, use the forwarded URL
+  if (window.location.hostname.includes('.app.github.dev')) {
+    // Replace this with the actual forwarded URL from the Ports tab
+    return 'https://fluffy-cod-wr6xg46jp9429j6j-8000.app.github.dev';
+  }
+  // Fallback to localhost for local development
+  return 'http://localhost:8000';
+})();
+
 
 interface ScheduleResponse {
   schedule: ScheduledTask[];

@@ -50,7 +50,8 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 origins = [
         "*",  # Be careful in production
         "https://localhost:3000",
-        "https://*.app.github.dev"
+        "https://*.app.github.dev",
+        "https://fluffy-cod-wr6xg46jp9429j6j-3000.app.github.dev"
         ]
 
 app.add_middleware(
