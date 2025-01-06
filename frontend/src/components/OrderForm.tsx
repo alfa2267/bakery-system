@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import { bakeryApi } from '../api/bakeryApi';
 import { Order, OrderItem } from '../types';
-import Alert from './ui/Alert';
+import Alert from '../ui/Alert';
 
 const OrderForm: React.FC = () => {
   const defaultItems: OrderItem[] = [
@@ -160,11 +160,14 @@ const OrderForm: React.FC = () => {
       <h2 className="text-2xl font-bold mb-6 text-gray-800">Place New Order</h2>
 
       {submitSuccess && (
-        <Alert className="mb-4 bg-green-50 border-green-200">
-          <CheckCircle className="w-5 h-5 text-green-600" />
-          Success, Order created successfully!
-        </Alert>
-      )}
+          <Alert 
+            variant="success"
+            title="Success"
+            className="mb-4"
+          >
+            Order created successfully!
+          </Alert>
+        )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Customer Info */}
@@ -255,10 +258,13 @@ const OrderForm: React.FC = () => {
         {warnings.length > 0 && (
           <div className="space-y-2">
             {warnings.map((warning, index) => (
-              <div key={index} className="flex items-center space-x-2 p-3 bg-yellow-50 text-yellow-700 rounded-md">
-                <AlertCircle className="w-5 h-5 text-yellow-600" />
-                <span className="text-sm">{warning}</span>
-              </div>
+              <Alert
+                key={index}
+                variant="warning"
+                className="flex items-center"
+              >
+                {warning}
+              </Alert>
             ))}
           </div>
         )}

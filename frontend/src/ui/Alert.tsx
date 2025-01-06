@@ -3,10 +3,16 @@ import React from 'react';
 interface AlertProps {
   variant?: 'success' | 'warning' | 'error';
   title?: string;
+  className?: string;
   children: React.ReactNode;
 }
 
-const Alert: React.FC<AlertProps> = ({ variant = 'success', title, children }) => {
+const Alert: React.FC<AlertProps> = ({ 
+  variant = 'success', 
+  title, 
+  className = '', 
+  children 
+}) => {
   const baseClasses = 'rounded-md border px-4 py-3 mb-4';
   
   const variantClasses = {
@@ -19,7 +25,7 @@ const Alert: React.FC<AlertProps> = ({ variant = 'success', title, children }) =
   const messageClasses = 'text-sm';
 
   return (
-    <div className={`${baseClasses} ${variantClasses[variant]}`}>
+    <div className={`${baseClasses} ${variantClasses[variant]} ${className}`}>
       {title && <h5 className={titleClasses}>{title}</h5>}
       <div className={messageClasses}>{children}</div>
     </div>
