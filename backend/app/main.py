@@ -11,10 +11,21 @@ import traceback
 from typing import List, Optional, Dict
 
 from .models import (
-    Order, ValidationResponse, ScheduleResponse,
-    DailyScheduleSummary, ResourceUtilization, ScheduledTask,
-    Recipe, Product, ProductionStep, Ingredient
+    Order, 
+    OrderItem,  # Add this line
+    ValidationResponse, 
+    ScheduleResponse,
+    DailyScheduleSummary, 
+    ResourceUtilization, 
+    ScheduledTask,
+    Recipe, 
+    Product, 
+    ProductionStep, 
+    Ingredient
 )
+
+
+
 from .scheduler import BakeryScheduler
 from .config import settings
 from .database import get_db, verify_db_connection, init_db
@@ -141,45 +152,57 @@ async def create_order(order: Order, db: Session = Depends(get_db)) -> ScheduleR
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="An unexpected error occurred during order processing")
 
-@app.post("/orders/debug")
-async def debug_order(order_data: dict):
-    """Debug endpoint to check order data structure"""
+@app.get("/orders")
+async def get_orders(db: Session = Depends(get_db)):
+    """Retrieve all orders"""
     try:
-        logger.debug(f"Received order data: {order_data}")
+        repository = OrderRepository(db)
         
-        # Try to create Order object
-        order = Order(**order_data)
+        # Fetch all orders
+        db_orders = repository.get_orders()
         
-        # Return detailed information about the parsed order
-        return {
-            "success": True,
-            "parsed_order": order.dict(exclude_none=True),
-            "field_values": {
-                "customer_name": order.customer_name,
-                "delivery_date": order.delivery_date,
-                "delivery_slot": order.delivery_slot,
-                "location": order.location,
-                "estimated_travel_time": order.estimated_travel_time,
-                "items": [{"product": item.product.dict(), "quantity": item.quantity} for item in order.items]
-            },
-            "validation": "Order data is valid"
-        }
-    except Exception as e:
-        logger.error(f"Order validation error: {str(e)}")
+        if not db_orders:
+            return {"orders": []}
+        
+        # Convert to list of orders with their items
+        orders = []
+        for db_order in db_orders:
+            order = Order(
+                id=db_order.id,
+                customer_name=db_order.customer_name,
+                delivery_date=db_order.delivery_date,
+                delivery_slot=db_order.delivery_slot,
+                location=db_order.location,
+                estimated_travel_time=db_order.estimated_travel_time,
+                items=[
+                    OrderItem(
+                        product=Product(
+                            id=item.product.id, 
+                            name=item.product.name
+                        ),
+                        quantity=item.quantity
+                    ) for item in db_order.items
+                ],
+                status=db_order.status,
+                created_at=db_order.created_at.isoformat() if db_order.created_at else None,
+                updated_at=db_order.created_at.isoformat() if db_order.created_at else None
+            )
+            orders.append(order)
+        
+        return {"orders": orders}
+        
+    except SQLAlchemyError as db_error:
+        logger.error(f"Database error fetching orders: {str(db_error)}")
         logger.error(traceback.format_exc())
-        return {
-            "success": False,
-            "error": str(e),
-            "received_data": order_data,
-            "expected_format": {
-                "customer_name": "string (or customerName)",
-                "delivery_date": "string (or deliveryDate)",
-                "delivery_slot": "string (or deliverySlot)",
-                "location": "string",
-                "estimated_travel_time": "integer (or estimatedTravelTime)",
-                "items": [{"product": {"id": "int", "name": "string"}, "quantity": "int"}]
-            }
-        }
+        raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
+    except Exception as unexpected_error:
+        logger.error(f"Unexpected error fetching orders: {str(unexpected_error)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching the orders")
+
+
+
+
 
 @app.get("/schedule/{date}")
 async def get_schedule(

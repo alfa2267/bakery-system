@@ -82,7 +82,7 @@ export const bakeryApi = {
           id: item.product.id
         },
         quantity: item.quantity
-      }))
+      })) || []
     };
 
     const response = await fetch(`${API_BASE_URL}/orders/validate`, {
@@ -101,9 +101,9 @@ export const bakeryApi = {
     const transformedOrder = {
       id: order.id,
       customer_name: order.customerName,
-      status: order.status,
-      created_at: order.created_at,
-      updated_at: order.updated_at,
+      status: order.status || 'new',
+      created_at: order.created_at || new Date().toISOString(),
+      updated_at: order.updated_at || new Date().toISOString(),
       delivery_date: order.deliveryDate,
       delivery_slot: order.deliverySlot,
       location: order.location,
@@ -132,29 +132,48 @@ export const bakeryApi = {
   },
 
   getOrders: async (): Promise<Order[]> => {
-    const response = await fetch(`${API_BASE_URL}/orders`, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-    });
-    const result = await handleResponse<{ orders: any[] }>(response);
-    return result.orders.map((order: any) => ({
-      id: order.id,
-      customerName: order.customer_name,
-      status: order.status,
-      created_at: order.created_at,
-      updated_at: order.updated_at,
-      deliveryDate: order.delivery_date,
-      deliverySlot: order.delivery_slot,
-      location: order.location,
-      estimatedTravelTime: order.estimated_travel_time,
-      items: order.items.map((item: any) => ({
-        product: {
-          name: item.product.name, 
-          id: item.product.id
-        },
-        quantity: item.quantity
-      }))
-    }));
+    try {
+      const response = await fetch(`${API_BASE_URL}/orders`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+      });
+
+      // Log raw response for debugging
+      const rawResponse = await response.text();
+      console.log('Raw orders response:', rawResponse);
+
+      // Parse the response manually
+      const result = JSON.parse(rawResponse);
+      console.log('Parsed orders result:', result);
+
+      // Validate the response structure
+      if (!result.orders || !Array.isArray(result.orders)) {
+        throw new Error('Invalid orders format: expected an array of orders');
+      }
+
+      // Transform the orders
+      return result.orders.map((order: any) => ({
+        id: order.id || '',
+        customerName: order.customer_name || '',
+        status: order.status || 'new',
+        created_at: order.created_at || null,
+        updated_at: order.updated_at || null,
+        deliveryDate: order.delivery_date || '',
+        deliverySlot: order.delivery_slot || '',
+        location: order.location || '',
+        estimatedTravelTime: order.estimated_travel_time || 0,
+        items: (order.items || []).map((item: any) => ({
+          product: {
+            name: item.product?.name || '', 
+            id: item.product?.id || 0
+          },
+          quantity: item.quantity || 0
+        }))
+      }));
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      throw error;
+    }
   },
 
   getSchedule: async (date: string, includeDetails: boolean = false): Promise<ScheduleResponse> => {
