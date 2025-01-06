@@ -139,6 +139,7 @@ export const bakeryApi = {
     };
   },
 
+
   getOrders: async (): Promise<Order[]> => {
     try {
       console.log('Attempting to fetch orders from:', `${API_BASE_URL}/orders`);
@@ -151,43 +152,65 @@ export const bakeryApi = {
   
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Error response:', errorText);
+        console.error('Error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
   
       const result = await response.json();
-      console.log('Orders fetched:', result);
+      console.log('Full API response:', result);
       
+      // Additional defensive checks
+      if (!result) {
+        console.error('Received empty response');
+        return [];
+      }
+  
+      // Check for orders array
+      const ordersData = result.orders;
+      
+      if (!Array.isArray(ordersData)) {
+        console.error('Orders is not an array:', ordersData);
+        return [];
+      }
+  
       // Transform orders from snake_case to camelCase
-      return result.orders.map((order: {
-        id: string;
-        customer_name: string;
-        status: string;
-        created_at: string;
-        updated_at: string;
-        delivery_date: string;
-        delivery_slot: string;
-        location: string;
-        estimated_travel_time?: number;
-        items: Array<{
-          product: string;
-          quantity: number;
-        }>;
-      }) => ({
-        id: order.id,
-        customerName: order.customer_name,
-        status: order.status,
-        created_at: order.created_at,
-        updated_at: order.updated_at,
-        deliveryDate: order.delivery_date,
-        deliverySlot: order.delivery_slot,
-        location: order.location,
-        estimatedTravelTime: order.estimated_travel_time,
-        items: order.items.map((item) => ({
-          product: item.product,
-          quantity: item.quantity
-        }))
-      }));
+      return ordersData.reduce<Order[]>((acc, order: any) => {
+        // Defensive checks for each order
+        if (!order) {
+          console.warn('Skipping null/undefined order');
+          return acc;
+        }
+  
+        try {
+          const transformedOrder: Order = {
+            id: order.id || '',
+            customerName: order.customer_name || '',
+            status: order.status || '',
+            created_at: order.created_at || '',
+            updated_at: order.updated_at || '',
+            deliveryDate: order.delivery_date || '',
+            deliverySlot: order.delivery_slot || '',
+            location: order.location || '',
+            estimatedTravelTime: order.estimated_travel_time || 0,
+            items: Array.isArray(order.items) 
+              ? order.items.map((item: any) => ({
+                  product: item.product || '',
+                  quantity: item.quantity || 0
+                }))
+              : []
+          };
+  
+          acc.push(transformedOrder);
+          return acc;
+        } catch (transformError) {
+          console.error('Error transforming order:', transformError);
+          return acc;
+        }
+      }, []);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
       throw error;
