@@ -228,7 +228,7 @@ export const bakeryApi = {
       schedule: any[];
       summary?: any;
     }>(response);
-    
+
     return {
       schedule: result.schedule.map(task => ({
         orderId: task.orderId ,
