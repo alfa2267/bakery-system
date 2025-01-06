@@ -1,26 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { bakeryApi } from '../api/bakeryApi';
-import { Order, OrderItem } from '../types';
+import { Order, OrderItem, Recipe } from '../types';
 import Alert from '../ui/Alert';
 
-// Import products from the products.json file
-import productsData from '../../../backend/app/products.json';
+// Import recipes from bakeryApi
+import { bakeryApi } from '../api/bakeryApi';
 
 const OrderForm: React.FC = () => {
-  const defaultItems: OrderItem[] = productsData.map(product => ({
-    product: product.name,
-    quantity: 0
-  }));
-
   const [formData, setFormData] = useState<Partial<Order>>({
     customerName: '',
     deliveryDate: '',
     deliverySlot: '',
     location: '',
-    items: defaultItems,
+    items: [],
     estimatedTravelTime: 30,
   });
 
+  const [recipesData, setRecipesData] = useState<Recipe[] | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [isValid, setIsValid] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -33,13 +28,38 @@ const OrderForm: React.FC = () => {
     '4': '16:00-17:30',
   };
 
-  const handleItemChange = (index: number, quantity: number) => {
-    if (!formData.items) return;
+  useEffect(() => {
+    const fetchRecipes = async () => {
+      try {
+        const fetchedRecipes = await bakeryApi.getAvailableRecipes();
+        console.log('Fetched Recipes:', fetchedRecipes); // Log the API response
+        if (Array.isArray(fetchedRecipes)) {
+          setRecipesData(fetchedRecipes);
+          const defaultItems: Recipe[] = fetchedRecipes.map(item => ({
+            product: item.product,
+            quantity: 0,
+          }));
+          setFormData((prevData) => ({ ...prevData, items: defaultItems }));
+        } else {
+          setWarnings(['Invalid data format received from recipes.']);
+        }
+      } catch (error) {
+        setWarnings(['Error fetching recipes. Please try again.']);
+      }
+    };
     
+
+    fetchRecipes();
+  }, []);
+
+  const handleItemChange = (index: number, quantity: number) => {
+    if (!formData.items || !recipesData) return;
+
     const updatedItems = [...formData.items];
+    const recipe = recipesData[index];
     updatedItems[index] = {
       ...updatedItems[index],
-      quantity: Math.max(0, quantity)
+      quantity: Math.max(0, Math.min(quantity, recipe.maxBatchSize)),
     };
 
     setFormData({ ...formData, items: updatedItems });
@@ -55,7 +75,7 @@ const OrderForm: React.FC = () => {
 
       // Filter out items with 0 quantity
       const validItems = formData.items?.filter(item => item.quantity > 0) || [];
-      
+
       // Don't validate if no items are selected
       if (validItems.length === 0) {
         setWarnings(['Please select at least one item']);
@@ -74,7 +94,7 @@ const OrderForm: React.FC = () => {
         deliverySlot: timeSlotMapping[formData.deliverySlot] || '',
         location: formData.location,
         estimatedTravelTime: formData.estimatedTravelTime,
-        items: validItems
+        items: validItems,
       };
 
       const response = await bakeryApi.validateOrder(orderData);
@@ -89,11 +109,11 @@ const OrderForm: React.FC = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (formData.customerName && 
-          formData.deliveryDate && 
-          formData.deliverySlot && 
-          formData.location && 
-          formData.items?.some(item => item.quantity > 0)) {
+      if (formData.customerName &&
+        formData.deliveryDate &&
+        formData.deliverySlot &&
+        formData.location &&
+        formData.items?.some(item => item.quantity > 0)) {
         validateOrder();
       }
     }, 500); // Add debounce
@@ -108,7 +128,7 @@ const OrderForm: React.FC = () => {
     try {
       setIsSubmitting(true);
       const validItems = formData.items.filter(item => item.quantity > 0);
-      
+
       if (validItems.length === 0) {
         setWarnings(['Please select at least one item']);
         return;
@@ -124,22 +144,22 @@ const OrderForm: React.FC = () => {
         deliverySlot: timeSlotMapping[formData.deliverySlot!]!,
         location: formData.location!,
         estimatedTravelTime: formData.estimatedTravelTime!,
-        items: validItems
+        items: validItems,
       };
 
       const response = await bakeryApi.createOrder(orderData);
       console.log('Order created:', response);
-      
+
       // Show success message
       setSubmitSuccess(true);
-      
+
       // Reset form
       setFormData({
         customerName: '',
         deliveryDate: '',
         deliverySlot: '',
         location: '',
-        items: defaultItems,
+        items: [],
         estimatedTravelTime: 30,
       });
       setWarnings([]);
@@ -232,22 +252,23 @@ const OrderForm: React.FC = () => {
 
           <table className="min-w-full table-auto border-collapse">
             <thead>
-              <tr className="bg-gray-100">
+              <tr className="border-b">
                 <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Product</th>
                 <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Quantity</th>
               </tr>
             </thead>
             <tbody>
-              {productsData.map((product, index) => (
-                <tr key={product.name}>
-                  <td className="px-4 py-2">{product.name}</td>
+              {recipesData?.map((recipe, index) => (
+                <tr key={recipe.id}>
+                  <td className="px-4 py-2 text-sm text-gray-700">{recipe.product}</td>
                   <td className="px-4 py-2">
                     <input
                       type="number"
-                      min={product.minQuantity}
-                      value={formData.items?.[index]?.quantity ?? 0}
-                      onChange={(e) => handleItemChange(index, parseInt(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={formData.items?.[index]?.quantity || 0}
+                      min={0}
+                      max={recipe.maxBatchSize}
+                      onChange={(e) => handleItemChange(index, parseInt(e.target.value, 10))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     />
                   </td>
                 </tr>
@@ -258,24 +279,19 @@ const OrderForm: React.FC = () => {
 
         {/* Warnings */}
         {warnings.length > 0 && (
-          <div className="space-y-2">
-            {warnings.map((warning, index) => (
-              <Alert
-                key={index}
-                variant="warning"
-                className="flex items-center"
-              >
-                {warning}
-              </Alert>
-            ))}
+          <div className="bg-yellow-100 text-yellow-800 p-4 rounded-md">
+            <ul>
+              {warnings.map((warning, index) => (
+                <li key={index} className="text-sm">{warning}</li>
+              ))}
+            </ul>
           </div>
         )}
 
-        {/* Submit Button */}
         <button
           type="submit"
           disabled={!isValid || isSubmitting}
-          className="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-md hover:bg-blue-700 disabled:opacity-50"
+          className="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           {isSubmitting ? 'Submitting...' : 'Submit Order'}
         </button>

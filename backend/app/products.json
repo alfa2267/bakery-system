@@ -1,0 +1,35 @@
+[
+    {
+      "id": 23,
+      "name": "cookies",
+      "shelf-life": "7 days",
+      "price": [
+        { "amount": 30, "unit": "kg", "qty": 3 }
+      ]
+    },
+    {
+      "id": 24,
+      "name": "brownies",
+      "shelf-life": "5 days",
+      "price": [
+        { "amount": 35, "unit": "kg", "qty": 2.5 }
+      ]
+    },
+    {
+      "id": 25,
+      "name": "cake",
+      "shelf-life": "3 days",
+      "price": [
+        { "amount": 40, "unit": "kg", "qty": 2 }
+      ]
+    },
+    {
+      "id": 26,
+      "name": "cinnamon rolls",
+      "shelf-life": "4 days",
+      "price": [
+        { "amount": 25, "unit": "kg", "qty": 4 }
+      ]
+    }
+  ]
+  

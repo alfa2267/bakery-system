@@ -1,7 +1,7 @@
 [
   {
-    "id": 23,
-    "productName": "cookies",
+    "product": { "id": 23, "name": "cookies" },
+    "id": 1001,
     "ingredients": [
       { "name": "eggs", "unit": "kg", "qty": "0.3" },
       { "name": "flour", "unit": "kg", "qty": "0.5" },
@@ -46,11 +46,16 @@
         "requiresMixer": false,
         "mustFollowImmediately": true
       }
-    ]
+    ],
+    "requiresChilling": true,
+    "maxChillTime": 240,
+    "minBatchSize": 6,
+    "maxBatchSize": 12,
+    "unit": "whole"
   },
   {
-    "id": 24,
-    "productName": "brownies",
+    "product": { "id": 24, "name": "brownies" },
+    "id": 1002,
     "ingredients": [
       { "name": "eggs", "unit": "kg", "qty": "0.4" },
       { "name": "flour", "unit": "kg", "qty": "0.6" },
@@ -87,11 +92,16 @@
         "requiresMixer": false,
         "mustFollowImmediately": true
       }
-    ]
+    ],
+    "requiresChilling": false,
+    "maxChillTime": 0,
+    "minBatchSize": 12,
+    "maxBatchSize": 20,
+    "unit": "whole"
   },
   {
-    "id": 25,
-    "productName": "cake",
+    "product": { "id": 25, "name": "cake" },
+    "id": 1003,
     "ingredients": [
       { "name": "eggs", "unit": "kg", "qty": "0.5" },
       { "name": "flour", "unit": "kg", "qty": "1" },
@@ -128,11 +138,16 @@
         "requiresMixer": false,
         "mustFollowImmediately": true
       }
-    ]
+    ],
+    "requiresChilling": false,
+    "maxChillTime": 0,
+    "minBatchSize": 12,
+    "maxBatchSize": 18,
+    "unit": "whole"
   },
   {
-    "id": 26,
-    "productName": "cinnamon rolls",
+    "product": { "id": 26, "name": "cinnamon rolls" },
+    "id": 1004,
     "ingredients": [
       { "name": "eggs", "unit": "kg", "qty": "0.4" },
       { "name": "flour", "unit": "kg", "qty": "0.8" },
@@ -179,6 +194,11 @@
         "requiresMixer": false,
         "mustFollowImmediately": true
       }
-    ]
+    ],
+    "requiresChilling": false,
+    "maxChillTime": 0,
+    "minBatchSize": 8,
+    "maxBatchSize": 16,
+    "unit": "whole"
   }
 ]

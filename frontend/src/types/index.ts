@@ -25,21 +25,39 @@ export type OrderStatus = 'new' | 'pending' | 'in-progress' | 'completed' | 'can
 // Production and Scheduling Types
 export type ProductionStep = 'mixing' | 'chilling' | 'shaping' | 'baking' | 'cooling';
 
-export type ViewMode = 
-  | 'Minute' 
-  | 'Hour' 
-  | 'Quarter Day' 
-  | 'Half Day' 
-  | 'Day' 
-  | 'Week' 
-  | 'Month';
-
-export interface ViewModeConfig {
-  hours: number[];
-  columnWidth: number;
-  label: (date: Date) => string;
+export interface Ingredient {
+  name: string;  // Name of the ingredient (e.g., "eggs")
+  unit: string;  // Unit of measurement (e.g., "kg")
+  qty: string;   // Quantity of the ingredient (e.g., "0.3")
 }
 
+export interface Step {
+  id: string;               // Unique identifier for the step
+  name: ProductionStep;     // Name of the step (mixing, chilling, etc.)
+  duration?: number;        // Duration in minutes (e.g., 25 minutes)
+  requiresHuman?: boolean;  // Whether a human is needed for the step
+  requiresOven?: boolean;   // Whether the step requires an oven
+  requiresMixer?: boolean;  // Whether the step requires a mixer
+  mustFollowImmediately?: boolean; // Whether this step must be followed immediately
+  scalingFactor?: number;   // Scaling factor for the recipe (optional)
+}
+
+export interface Recipe {
+  id: number;               // Unique identifier for the recipe (e.g., 1001)
+  product: {
+    id: number;             // Product ID (e.g., 23)
+    name: string;           // Product name (e.g., "cookies")
+  };
+  ingredients: Ingredient[];  // List of ingredients for the recipe
+  steps: Step[];              // List of steps required to make the product
+  requiresChilling: boolean;  // Whether the recipe requires chilling
+  maxChillTime: number;       // Maximum chilling time in minutes (e.g., 240)
+  minBatchSize: number;       // Minimum batch size (e.g., 6)
+  maxBatchSize: number;       // Maximum batch size (e.g., 12)
+  unit: string;               // Unit of the product (e.g., "whole")
+}
+
+// Scheduling and Task-related Interfaces
 export interface ScheduledTask {
   orderId: string;
   step: ProductionStep;
@@ -95,51 +113,19 @@ export interface GanttOptions {
   };
 }
 
-// Utility Functions
-export function parseDateString(dateString: string): Date {
-  const date = new Date(dateString);
-  
-  if (isNaN(date.getTime())) {
-    throw new Error(`Invalid date string: ${dateString}`);
-  }
-  
-  return date;
-}
+export type ViewMode = 
+  | 'Minute' 
+  | 'Hour' 
+  | 'Quarter Day' 
+  | 'Half Day' 
+  | 'Day' 
+  | 'Week' 
+  | 'Month';
 
-export function formatDateToISO(date: Date): string {
-  return date.toISOString();
-}
-
-export function isValidDate(date: any): date is Date {
-  return date instanceof Date && !isNaN(date.getTime());
-}
-
-export function transformScheduledTask(task: any): ScheduledTask {
-  // Add more robust type checking and transformation
-  if (!task) {
-    throw new Error('Cannot transform undefined or null task');
-  }
-
-  return {
-    orderId: task.orderId || task.order_id || '',
-    step: (task.step || 'mixing') as ProductionStep,
-    startTime: task.startTime 
-      ? (task.startTime instanceof Date 
-          ? task.startTime 
-          : parseDateString(task.startTime || task.start_time))
-      : new Date(),
-    endTime: task.endTime
-      ? (task.endTime instanceof Date 
-          ? task.endTime 
-          : parseDateString(task.endTime || task.end_time))
-      : new Date(),
-    resources: Array.isArray(task.resources) ? task.resources : [],
-    batchSize: task.batchSize || task.batch_size || 0,
-    status: task.status as TaskStatus || 'pending',
-    name: task.name || '',
-    dependencies: Array.isArray(task.dependencies) ? task.dependencies : [],
-    progress: task.progress || 0
-  };
+export interface ViewModeConfig {
+  hours: number[];
+  columnWidth: number;
+  label: (date: Date) => string;
 }
 
 // Default Configuration Constants
