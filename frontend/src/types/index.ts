@@ -51,6 +51,7 @@ export interface ScheduledTask {
   name?: string;
   dependencies?: string[];
   progress?: number;
+  productName?: string;
 }
 
 // Explicit type for task statuses

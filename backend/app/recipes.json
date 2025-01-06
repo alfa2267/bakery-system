@@ -1,136 +1,184 @@
-{
-    "cookies": {
-      "productType": "cookies",
-      "steps": [
-        {
-          "name": "mixing",
-          "duration": 25,
-          "requiresHuman": true,
-          "requiresOven": false,
-          "requiresMixer": true,
-          "mustFollowImmediately": false,
-          "scalingFactor": 0.7
-        },
-        {
-          "name": "chilling",
-          "duration": 240,
-          "requiresHuman": false,
-          "requiresOven": false,
-          "requiresMixer": false,
-          "mustFollowImmediately": false
-        },
-        {
-          "name": "shaping",
-          "duration": 30,
-          "requiresHuman": true,
-          "requiresOven": false,
-          "requiresMixer": false,
-          "mustFollowImmediately": true
-        },
-        {
-          "name": "baking",
-          "duration": 15,
-          "requiresHuman": false,
-          "requiresOven": true,
-          "requiresMixer": false,
-          "mustFollowImmediately": true
-        }
-      ],
-      "requiresChilling": true,
-      "maxChillTime": 960,
-      "minBatchSize": 6,
-      "maxBatchSize": 24
-    },
-    "brownies": {
-      "productType": "brownies",
-      "steps": [
-        {
-          "name": "mixing",
-          "duration": 20,
-          "requiresHuman": true,
-          "requiresOven": false,
-          "requiresMixer": true,
-          "mustFollowImmediately": false,
-          "scalingFactor": 0.5
-        },
-        {
-          "name": "baking",
-          "duration": 35,
-          "requiresHuman": false,
-          "requiresOven": true,
-          "requiresMixer": false,
-          "mustFollowImmediately": true
-        },
-        {
-          "name": "cooling",
-          "duration": 120,
-          "requiresHuman": false,
-          "requiresOven": false,
-          "requiresMixer": false,
-          "mustFollowImmediately": true
-        }
-      ],
-      "requiresChilling": false,
-      "maxChillTime": 0,
-      "minBatchSize": 12,
-      "maxBatchSize": 36
-    },
-    "croissants": {
-      "productType": "croissants",
-      "steps": [
-        {
-          "name": "mixing",
-          "duration": 30,
-          "requiresHuman": true,
-          "requiresOven": false,
-          "requiresMixer": true,
-          "mustFollowImmediately": false,
-          "scalingFactor": 0.6
-        },
-        {
-          "name": "folding",
-          "duration": 45,
-          "requiresHuman": true,
-          "requiresOven": false,
-          "requiresMixer": false,
-          "mustFollowImmediately": true
-        },
-        {
-          "name": "chilling",
-          "duration": 360,
-          "requiresHuman": false,
-          "requiresOven": false,
-          "requiresMixer": false,
-          "mustFollowImmediately": false
-        },
-        {
-          "name": "shaping",
-          "duration": 40,
-          "requiresHuman": true,
-          "requiresOven": false,
-          "requiresMixer": false,
-          "mustFollowImmediately": true
-        },
-        {
-          "name": "proofing",
-          "duration": 120,
-          "requiresHuman": false,
-          "requiresOven": false,
-          "requiresMixer": false,
-          "mustFollowImmediately": true
-        },
-        {
-          "name": "baking",
-          "duration": 20,
-          "requiresHuman": false,
-          "requiresOven": true,
-          "requiresMixer": false,
-          "mustFollowImmediately": true
-        }
-      ],
-      "requiresChilling": true,
-      "maxChillTime": 1440,
-      "minBatchSize": 8,
-      "maxBatchSize": 24
-    }
+[
+  {
+    "id": 23,
+    "productName": "cookies",
+    "ingredients": [
+      { "name": "eggs", "unit": "kg", "qty": "0.3" },
+      { "name": "flour", "unit": "kg", "qty": "0.5" },
+      { "name": "butter", "unit": "kg", "qty": "0.2" },
+      { "name": "sugar", "unit": "kg", "qty": "0.4" }
+    ],
+    "steps": [
+      {
+        "id": "14",
+        "name": "mixing",
+        "duration": 25,
+        "requiresHuman": true,
+        "requiresOven": false,
+        "requiresMixer": true,
+        "mustFollowImmediately": false,
+        "scalingFactor": 0.7
+      },
+      {
+        "id": "15",
+        "name": "chilling",
+        "duration": 240,
+        "requiresHuman": false,
+        "requiresOven": false,
+        "requiresMixer": false,
+        "mustFollowImmediately": false
+      },
+      {
+        "id": "16",
+        "name": "shaping",
+        "duration": 30,
+        "requiresHuman": true,
+        "requiresOven": false,
+        "requiresMixer": false,
+        "mustFollowImmediately": true
+      },
+      {
+        "id": "17",
+        "name": "baking",
+        "duration": 15,
+        "requiresHuman": false,
+        "requiresOven": true,
+        "requiresMixer": false,
+        "mustFollowImmediately": true
+      }
+    ]
+  },
+  {
+    "id": 24,
+    "productName": "brownies",
+    "ingredients": [
+      { "name": "eggs", "unit": "kg", "qty": "0.4" },
+      { "name": "flour", "unit": "kg", "qty": "0.6" },
+      { "name": "butter", "unit": "kg", "qty": "0.25" },
+      { "name": "sugar", "unit": "kg", "qty": "0.3" },
+      { "name": "cocoa powder", "unit": "kg", "qty": "0.1" }
+    ],
+    "steps": [
+      {
+        "id": "18",
+        "name": "mixing",
+        "duration": 20,
+        "requiresHuman": true,
+        "requiresOven": false,
+        "requiresMixer": true,
+        "mustFollowImmediately": false,
+        "scalingFactor": 0.5
+      },
+      {
+        "id": "19",
+        "name": "baking",
+        "duration": 35,
+        "requiresHuman": false,
+        "requiresOven": true,
+        "requiresMixer": false,
+        "mustFollowImmediately": true
+      },
+      {
+        "id": "20",
+        "name": "cooling",
+        "duration": 120,
+        "requiresHuman": false,
+        "requiresOven": false,
+        "requiresMixer": false,
+        "mustFollowImmediately": true
+      }
+    ]
+  },
+  {
+    "id": 25,
+    "productName": "cake",
+    "ingredients": [
+      { "name": "eggs", "unit": "kg", "qty": "0.5" },
+      { "name": "flour", "unit": "kg", "qty": "1" },
+      { "name": "butter", "unit": "kg", "qty": "0.3" },
+      { "name": "sugar", "unit": "kg", "qty": "0.4" },
+      { "name": "baking powder", "unit": "kg", "qty": "0.02" }
+    ],
+    "steps": [
+      {
+        "id": "21",
+        "name": "mixing",
+        "duration": 20,
+        "requiresHuman": true,
+        "requiresOven": false,
+        "requiresMixer": true,
+        "mustFollowImmediately": false,
+        "scalingFactor": 0.5
+      },
+      {
+        "id": "22",
+        "name": "baking",
+        "duration": 40,
+        "requiresHuman": false,
+        "requiresOven": true,
+        "requiresMixer": false,
+        "mustFollowImmediately": true
+      },
+      {
+        "id": "23",
+        "name": "cooling",
+        "duration": 60,
+        "requiresHuman": false,
+        "requiresOven": false,
+        "requiresMixer": false,
+        "mustFollowImmediately": true
+      }
+    ]
+  },
+  {
+    "id": 26,
+    "productName": "cinnamon rolls",
+    "ingredients": [
+      { "name": "eggs", "unit": "kg", "qty": "0.4" },
+      { "name": "flour", "unit": "kg", "qty": "0.8" },
+      { "name": "butter", "unit": "kg", "qty": "0.3" },
+      { "name": "sugar", "unit": "kg", "qty": "0.35" },
+      { "name": "cinnamon", "unit": "kg", "qty": "0.05" },
+      { "name": "yeast", "unit": "kg", "qty": "0.02" }
+    ],
+    "steps": [
+      {
+        "id": "27",
+        "name": "mixing",
+        "duration": 25,
+        "requiresHuman": true,
+        "requiresOven": false,
+        "requiresMixer": true,
+        "mustFollowImmediately": false,
+        "scalingFactor": 0.6
+      },
+      {
+        "id": "28",
+        "name": "proofing",
+        "duration": 120,
+        "requiresHuman": false,
+        "requiresOven": false,
+        "requiresMixer": false,
+        "mustFollowImmediately": true
+      },
+      {
+        "id": "29",
+        "name": "shaping",
+        "duration": 30,
+        "requiresHuman": true,
+        "requiresOven": false,
+        "requiresMixer": false,
+        "mustFollowImmediately": true
+      },
+      {
+        "id": "30",
+        "name": "baking",
+        "duration": 20,
+        "requiresHuman": false,
+        "requiresOven": true,
+        "requiresMixer": false,
+        "mustFollowImmediately": true
+      }
+    ]
   }
+]

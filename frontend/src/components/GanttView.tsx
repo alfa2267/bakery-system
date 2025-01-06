@@ -179,7 +179,10 @@ const GanttView: React.FC = () => {
                         style={{ left: `${barLeft}%`, width: `${barWidth}%` }}
                       >
                         <div className="px-2 text-white truncate">{`Order ${task.orderId.slice(0, 8)}`}</div>
+                        <div className="px-2 text-white truncate">{`Order ${task.productName}`}</div>
+
                       </div>
+                      
                     );
                   })}
                 </div>

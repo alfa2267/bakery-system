@@ -123,6 +123,10 @@ async def create_order(order: Order, db: Session = Depends(get_db)) -> ScheduleR
                 logger.error(traceback.format_exc())
                 raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
             
+            # Include product/item details in the scheduled tasks
+            for task in scheduled_tasks:
+                task.product = order.product  # Assuming `product` is a field in the `Order` model
+            
             return ScheduleResponse(
                 orderId=db_order.id,
                 tasks=scheduled_tasks
@@ -138,35 +142,6 @@ async def create_order(order: Order, db: Session = Depends(get_db)) -> ScheduleR
         logger.error(f"Unexpected error in order creation: {str(unexpected_error)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="An unexpected error occurred during order processing")
-
-@app.get("/orders")
-async def list_orders(
-    db: Session = Depends(get_db),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000)
-):
-    """
-    Retrieve a list of orders with optional pagination
-    """
-    try:
-        logger.info(f"Fetching orders")
-        repository = OrderRepository(db)
-        
-        # Fetch orders from the database
-        orders = repository.get_orders()
-        
-        return {
-            "orders": orders,
-            "total": len(orders)
-        }
-    except SQLAlchemyError as db_error:
-        logger.error(f"Database error fetching orders: {str(db_error)}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
-    except Exception as unexpected_error:
-        logger.error(f"Unexpected error fetching orders: {str(unexpected_error)}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching orders")
 
 @app.get("/schedule/{date}")
 async def get_schedule(
@@ -198,7 +173,8 @@ async def get_schedule(
                     endTime=task.end_time,
                     resources=task.resources,
                     batchSize=task.batch_size,
-                    status=task.status or 'pending'
+                    status=task.status or 'pending',
+                    productName=task.product_name  # Correct field reference
                 )
                 for task in db_tasks
             ]
@@ -233,6 +209,7 @@ async def get_schedule(
         logger.error(f"Unexpected error fetching schedule: {str(unexpected_error)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching the schedule")
+
 
 def _calculate_resource_utilization(tasks: List[ScheduledTask]) -> List[ResourceUtilization]:
     """

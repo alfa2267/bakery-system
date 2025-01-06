@@ -32,7 +32,6 @@ class BakeryScheduler:
 
         recipes = {}
         for product_type, recipe_info in recipe_data.items():
-            # Convert JSON steps to ProductionStep objects
             try:
                 steps = [
                     ProductionStep(
@@ -50,7 +49,6 @@ class BakeryScheduler:
                 logger.error(f"Missing required key {e} in recipe for {product_type}")
                 raise
 
-            # Create Recipe object
             recipes[product_type] = Recipe(
                 productType=recipe_info['productType'],
                 steps=steps,
@@ -62,10 +60,6 @@ class BakeryScheduler:
 
         return recipes
 
-   
-
-# In scheduler.py
-
     def validate_order(self, order: Order) -> Tuple[bool, List[str]]:
         warnings = []
         is_valid = True
@@ -75,7 +69,6 @@ class BakeryScheduler:
             is_valid = False
             warnings.append("Order has no items")
 
-        # Check delivery date - Change from deliveryDate to delivery_date
         try:
             delivery_date = datetime.strptime(order.delivery_date, "%Y-%m-%d").date()
             if delivery_date < datetime.now().date():
@@ -87,7 +80,6 @@ class BakeryScheduler:
             is_valid = False
             warnings.append("Invalid delivery date format")
 
-        # Validate each item
         for item in order.items:
             recipe = self.recipes.get(item.product)
             if not recipe:
@@ -96,25 +88,18 @@ class BakeryScheduler:
                 warnings.append(f"Unknown product: {item.product}. Available products: {', '.join(self.recipes.keys())}")
                 continue
 
-            # Check batch size constraints
             if item.quantity < recipe.minBatchSize:
                 logger.warning(f"Order {order.id}: Item {item.product} has a quantity lower than minimum batch size")
                 warnings.append(
-                    f"Minimum batch size for {item.product} is {recipe.minBatchSize}. "
-                    f"Order will be rounded up."
+                    f"Minimum batch size for {item.product} is {recipe.minBatchSize}. Order will be rounded up."
                 )
 
-            # Calculate number of batches needed
             batches = (item.quantity + recipe.maxBatchSize - 1) // recipe.maxBatchSize
             if batches > 1:
                 logger.info(f"Order {order.id}: Item {item.product} requires {batches} batches")
-                warnings.append(
-                    f"Order requires {batches} batches of {item.product}"
-                )
+                warnings.append(f"Order requires {batches} batches of {item.product}")
 
         return is_valid, warnings
-
-
 
     def get_available_products(self) -> List[Dict]:
         """Return list of available products and their constraints"""
@@ -130,33 +115,41 @@ class BakeryScheduler:
         ]
         logger.info(f"Available products: {', '.join([prod['product'] for prod in available_products])}")
         return available_products
+        
 
     def schedule_order(self, order: Order) -> List[ScheduledTask]:
-        if not order.items:
-            logger.error(f"Cannot schedule order {order.id}: No items found.")
-            raise ValueError("Cannot schedule order: No items found.")
-            
         tasks = []
-        delivery_time = datetime.strptime(f"{order.delivery_date} {order.delivery_slot.split('-')[0]}", "%Y-%m-%d %H:%M")
+        current_time = datetime.now()  # Start scheduling from now
 
         for item in order.items:
-            recipe = self.recipes.get(item.product)
-            if not recipe:
-                logger.error(f"Unknown recipe for product {item.product} in order {order.id}")
-                raise ValueError(f"Unknown recipe for product: {item.product}")
-            
-            batches = self._calculate_batches(item.quantity, recipe)
-            
-            batch_tasks = self._schedule_batches(
-                batches,
-                recipe,
-                delivery_time,
-                order.id
-            )
-            tasks.extend(batch_tasks)
+            for step in self.get_recipe_steps(item.product):  # Iterate through each product's steps
+                # Get the required resources dynamically
+                resources = self._get_required_resources(step)
 
-        logger.info(f"Order {order.id} scheduled with {len(tasks)} tasks")
+                # Calculate start_time and end_time for the step
+                end_time = current_time + timedelta(minutes=step.duration)
+                start_time = current_time
+
+                task = ScheduledTask(
+                    orderId=order.id,
+                    orderItemId=item.id,  # Add the item ID here
+                    orderItemName=item.product,  # Add the item name here
+                    step=step.name,
+                    startTime=start_time,
+                    endTime=end_time,
+                    resources=resources,  # Assign the resources
+                    batchSize=item.quantity,  # Use item.quantity for the batch size
+                    status="pending",
+                    product=item.product  # Use the product from the item
+                )
+                tasks.append(task)
+
+                # Update current_time for the next step in the batch
+                current_time = end_time
+
         return tasks
+
+
 
 
 
@@ -165,7 +158,7 @@ class BakeryScheduler:
         """Calculate optimal batch sizes"""
         batches = []
         remaining = quantity
-        
+
         while remaining > 0:
             if remaining > recipe.maxBatchSize:
                 batches.append(recipe.maxBatchSize)
@@ -177,7 +170,7 @@ class BakeryScheduler:
                 else:
                     batches.append(remaining)
                     remaining = 0
-                    
+
         logger.debug(f"Batches calculated: {batches}")
         return batches
 
@@ -201,29 +194,27 @@ class BakeryScheduler:
         tasks = []
         current_time = delivery_time
 
-        # Schedule backwards from delivery time
         for batch_size in batches:
             batch_tasks = []
 
-            # Go through steps in reverse
             for step in reversed(recipe.steps):
                 end_time = current_time
                 start_time = end_time - timedelta(minutes=step.duration)
-                
+
                 task = ScheduledTask(
                     orderId=order_id,
                     step=step.name,
                     startTime=start_time,
                     endTime=end_time,
                     resources=self._get_required_resources(step),
-                    batchSize=batch_size
+                    batchSize=batch_size,
+                    productName=recipe.productType
                 )
                 batch_tasks.append(task)
 
                 if step.mustFollowImmediately and len(recipe.steps) > 1:
                     current_time = start_time
                 else:
-                    # Allow for flexible timing if not immediate
                     current_time = self._find_available_time(
                         start_time,
                         step,
@@ -241,6 +232,12 @@ class BakeryScheduler:
         step: ProductionStep,
         batch_size: int
     ) -> datetime:
-        # For simplicity, let's assume resources are always available.
-        # You can add real resource conflict checking here.
         return desired_time
+
+    def get_recipe_steps(self, product_type: str) -> List[ProductionStep]:
+        """Retrieve the recipe steps for a specific product."""
+        recipe = self.recipes.get(product_type)
+        if not recipe:
+            logger.error(f"Recipe for product {product_type} not found.")
+            raise ValueError(f"Recipe for product {product_type} not found.")
+        return recipe.steps

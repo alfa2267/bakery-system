@@ -4,6 +4,7 @@ from typing import List, Optional, Dict
 from datetime import datetime
 from . import models
 import logging
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -30,47 +31,58 @@ class OrderRepository:
             db_items = [
                 models.OrderItemDB(
                     order_id=order.id,
-                    product=item.product,
+                    product=item.product,  # This should refer to each item in the order.items list
                     quantity=item.quantity
                 )
-                for item in order.items
+                for item in order.items  # Ensure you're iterating over items in the order
             ]
 
-            # Create scheduled tasks
+
+            # Add order and items to the session
+            logger.info("Adding order and items to the session")
+            self.db.add(db_order)
+            self.db.add_all(db_items)
+
+            # Commit to get IDs for order items
+            self.db.commit()
+            logger.info("Order and items committed successfully")
+
+            # Refresh the items to get their IDs
+            for db_item in db_items:
+                self.db.refresh(db_item)
+
+            # Create scheduled tasks with associated order_item_id
             db_tasks = [
                 models.ScheduledTaskDB(
                     order_id=order.id,
+                    order_item_id=item.id,  # Ensure this is set from the db_item
                     step=task.step,
                     start_time=task.startTime,
                     end_time=task.endTime,
                     resources=task.resources,
                     batch_size=task.batchSize,
-                    status=task.status or 'pending'  # Default status is pending
+                    status=task.status or 'pending'
                 )
-                for task in tasks
+                for item, task in zip(db_items, tasks)
             ]
 
-            # Add everything to the session
-            logger.info("Adding order, items, and tasks to the session")
-            self.db.add(db_order)
-            self.db.add_all(db_items)
+            # Add tasks to the session
             self.db.add_all(db_tasks)
 
             # Commit the transaction
             self.db.commit()
             logger.info("Order and associated items and tasks committed successfully")
 
-            # Refresh to get the complete order with relationships
+            # Refresh the order to get relationships
             self.db.refresh(db_order)
             logger.info("Order with ID %s refreshed", db_order.id)
             
             return db_order
-            
+
         except SQLAlchemyError as e:
             self.db.rollback()
             logger.error("Error creating order with ID %s: %s", order.id, str(e))
-            raise e
-
+            raise HTTPException(status_code=500, detail="Database error occurred while creating the order.")
 
     def get_order(self, order_id: str) -> Optional[models.OrderDB]:
         """Fetch a specific order by its ID"""

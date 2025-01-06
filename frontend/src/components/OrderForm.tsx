@@ -1,15 +1,16 @@
-
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, CheckCircle } from 'lucide-react';
 import { bakeryApi } from '../api/bakeryApi';
 import { Order, OrderItem } from '../types';
 import Alert from '../ui/Alert';
 
+// Import products from the products.json file
+import productsData from '../../../backend/app/products.json';
+
 const OrderForm: React.FC = () => {
-  const defaultItems: OrderItem[] = [
-    { product: 'cookies', quantity: 0 },
-    { product: 'brownies', quantity: 0 }
-  ];
+  const defaultItems: OrderItem[] = productsData.map(product => ({
+    product: product.name,
+    quantity: 0
+  }));
 
   const [formData, setFormData] = useState<Partial<Order>>({
     customerName: '',
@@ -86,7 +87,6 @@ const OrderForm: React.FC = () => {
     }
   };
 
-  // Only validate when form data changes and we have all required fields
   useEffect(() => {
     const timer = setTimeout(() => {
       if (formData.customerName && 
@@ -160,14 +160,14 @@ const OrderForm: React.FC = () => {
       <h2 className="text-2xl font-bold mb-6 text-gray-800">Place New Order</h2>
 
       {submitSuccess && (
-          <Alert 
-            variant="success"
-            title="Success"
-            className="mb-4"
-          >
-            Order created successfully!
-          </Alert>
-        )}
+        <Alert 
+          variant="success"
+          title="Success"
+          className="mb-4"
+        >
+          Order created successfully!
+        </Alert>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Customer Info */}
@@ -230,28 +230,30 @@ const OrderForm: React.FC = () => {
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-700">Order Items</h3>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Cookies (min 6)</label>
-              <input
-                type="number"
-                min="6"
-                value={formData.items?.[0]?.quantity ?? 0}
-                onChange={(e) => handleItemChange(0, parseInt(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Brownies (min 12)</label>
-              <input
-                type="number"
-                min="12"
-                value={formData.items?.[1]?.quantity ?? 0}
-                onChange={(e) => handleItemChange(1, parseInt(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
+          <table className="min-w-full table-auto border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Product</th>
+                <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {productsData.map((product, index) => (
+                <tr key={product.name}>
+                  <td className="px-4 py-2">{product.name}</td>
+                  <td className="px-4 py-2">
+                    <input
+                      type="number"
+                      min={product.minQuantity}
+                      value={formData.items?.[index]?.quantity ?? 0}
+                      onChange={(e) => handleItemChange(index, parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
         {/* Warnings */}
@@ -273,13 +275,9 @@ const OrderForm: React.FC = () => {
         <button
           type="submit"
           disabled={!isValid || isSubmitting}
-          className={`w-full py-2 px-4 rounded-md font-semibold transition-colors duration-200 ${
-            isValid && !isSubmitting
-              ? 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
+          className="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-md hover:bg-blue-700 disabled:opacity-50"
         >
-          {isSubmitting ? 'Creating Order...' : 'Place Order'}
+          {isSubmitting ? 'Submitting...' : 'Submit Order'}
         </button>
       </form>
     </div>

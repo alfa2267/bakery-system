@@ -5,6 +5,7 @@ from sqlalchemy import Column, Integer, String, Boolean, Float, ForeignKey, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import JSON
+import uuid
 
 # Instead, ensure you're importing Base from database
 from .database import Base
@@ -17,8 +18,9 @@ class OrderItemDB(Base):
     order_id = Column(String, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
     product = Column(String, nullable=False)
     quantity = Column(Integer, nullable=False)
-
+    
     order = relationship("OrderDB", back_populates="items")
+    tasks = relationship("ScheduledTaskDB", back_populates="order_item", cascade="all, delete-orphan")  # Added reverse relationship
 
 class OrderDB(Base):
     __tablename__ = "orders"
@@ -46,10 +48,15 @@ class ScheduledTaskDB(Base):
     batch_size = Column(Integer, nullable=False)
     status = Column(String, nullable=False, default='pending')  # pending, in-progress, completed, blocked
     
+    # New field to associate task with a specific product/item
+    order_item_id = Column(Integer, ForeignKey("order_items.id", ondelete="CASCADE"), nullable=False)
+    
     order = relationship("OrderDB", back_populates="tasks")
+    order_item = relationship("OrderItemDB", back_populates="tasks")  # Add the reverse relationship
 
 # Pydantic Models for API
 class OrderItem(BaseModel):
+    id: str = str(uuid.uuid4()) 
     product: str
     quantity: int = Field(gt=0)  # Ensure quantity is greater than 0
 
@@ -71,7 +78,6 @@ class Order(BaseModel):
     class Config:
        from_attributes = True
        
-
 class ProductionStep(BaseModel):
     name: str
     duration: int = Field(gt=0)  # Must be positive
@@ -101,6 +107,8 @@ class ScheduledTask(BaseModel):
     resources: List[str]
     batchSize: int = Field(gt=0)  # Must be positive
     status: Optional[str] = 'pending'
+    orderItemId: str
+    orderItemName: str
 
     class Config:
         from_attributes = True

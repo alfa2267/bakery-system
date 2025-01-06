@@ -8,15 +8,11 @@ import {
 } from '../types';
 
 const API_BASE_URL = (() => {
-  // If running in Codespaces, use the forwarded URL
   if (window.location.hostname.includes('.app.github.dev')) {
-    // Replace this with the actual forwarded URL from the Ports tab
     return 'https://fluffy-cod-wr6xg46jp9429j6j-8000.app.github.dev';
   }
-  // Fallback to localhost for local development
   return 'http://localhost:8000';
 })();
-
 
 interface ScheduleResponse {
   schedule: ScheduledTask[];
@@ -33,7 +29,7 @@ interface ScheduleResponse {
 }
 
 interface ConfigResponse {
-  delivery_slots: Array<{id: string, time: string}>;
+  delivery_slots: Array<{ id: string, time: string }>;
   business_hours: {
     store: { open: string, close: string };
     kitchen: { open: string, close: string };
@@ -59,11 +55,10 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 export const bakeryApi = {
   validateOrder: async (order: Partial<Order>): Promise<ValidationResponse> => {
-    // Transform the order to match the server's expected format
     const transformedOrder = {
       id: order.id,
       customer_name: order.customerName,
-      status: order.status || 'new',
+      status: order.status || 'new', // Default status is 'new'
       created_at: order.created_at || new Date().toISOString(),
       updated_at: order.updated_at || new Date().toISOString(),
       delivery_date: order.deliveryDate,
@@ -76,23 +71,15 @@ export const bakeryApi = {
       }))
     };
 
-    console.log('Validating order:', transformedOrder);
-
     const response = await fetch(`${API_BASE_URL}/orders/validate`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(transformedOrder),
     });
     return handleResponse<ValidationResponse>(response);
   },
 
-  createOrder: async (order: Order): Promise<{
-    orderId: string;
-    tasks: ScheduledTask[];
-  }> => {
-    // Transform the order to match the server's expected format
+  createOrder: async (order: Order): Promise<{ orderId: string, tasks: ScheduledTask[] }> => {
     const transformedOrder = {
       id: order.id,
       customer_name: order.customerName,
@@ -108,142 +95,52 @@ export const bakeryApi = {
         quantity: item.quantity
       }))
     };
-    
-    console.log('Creating order:', transformedOrder);
 
     const response = await fetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(transformedOrder),
     });
     
-    const result = await handleResponse<{
-      orderId: string;
-      tasks: any[];
-    }>(response);
-    
-    // Transform tasks from snake_case to camelCase and convert dates
+    const result = await handleResponse<{ orderId: string, tasks: any[] }>(response);
     return {
       orderId: result.orderId,
-      tasks: result.tasks.map(task => ({
-        orderId: task.order_id,
-        step: task.step,
-        startTime: new Date(task.start_time),
-        endTime: new Date(task.end_time),
-        resources: task.resources,
-        batchSize: task.batch_size,
-        status: task.status
-      }))
+      tasks: result.tasks.map(transformScheduledTask)
     };
   },
 
-
   getOrders: async (): Promise<Order[]> => {
-    try {
-      console.log('Attempting to fetch orders from:', `${API_BASE_URL}/orders`);
-      const response = await fetch(`${API_BASE_URL}/orders`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        }
-      });
-  
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText
-        });
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-      }
-  
-      const result = await response.json();
-      console.log('Full API response:', result);
-      
-      // Additional defensive checks
-      if (!result) {
-        console.error('Received empty response');
-        return [];
-      }
-  
-      // Check for orders array
-      const ordersData = result.orders;
-      
-      if (!Array.isArray(ordersData)) {
-        console.error('Orders is not an array:', ordersData);
-        return [];
-      }
-  
-      // Transform orders from snake_case to camelCase
-      return ordersData.reduce<Order[]>((acc, order: any) => {
-        // Defensive checks for each order
-        if (!order) {
-          console.warn('Skipping null/undefined order');
-          return acc;
-        }
-  
-        try {
-          const transformedOrder: Order = {
-            id: order.id || '',
-            customerName: order.customer_name || '',
-            status: order.status || '',
-            created_at: order.created_at || '',
-            updated_at: order.updated_at || '',
-            deliveryDate: order.delivery_date || '',
-            deliverySlot: order.delivery_slot || '',
-            location: order.location || '',
-            estimatedTravelTime: order.estimated_travel_time || 0,
-            items: Array.isArray(order.items) 
-              ? order.items.map((item: any) => ({
-                  product: item.product || '',
-                  quantity: item.quantity || 0
-                }))
-              : []
-          };
-  
-          acc.push(transformedOrder);
-          return acc;
-        } catch (transformError) {
-          console.error('Error transforming order:', transformError);
-          return acc;
-        }
-      }, []);
-    } catch (error) {
-      console.error('Failed to fetch orders:', error);
-      throw error;
-    }
+    const response = await fetch(`${API_BASE_URL}/orders`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+    });
+    const result = await handleResponse<any>(response);
+    return result.orders.map((order: any) => ({
+      id: order.id,
+      customerName: order.customer_name,
+      status: order.status,
+      created_at: order.created_at,
+      updated_at: order.updated_at,
+      deliveryDate: order.delivery_date,
+      deliverySlot: order.delivery_slot,
+      location: order.location,
+      estimatedTravelTime: order.estimated_travel_time,
+      items: order.items.map((item: any) => ({
+        product: item.product,
+        quantity: item.quantity
+      }))
+    }));
   },
 
   getSchedule: async (date: string, includeDetails: boolean = false): Promise<ScheduleResponse> => {
     const url = new URL(`${API_BASE_URL}/schedule/${date}`);
-    if (includeDetails) {
-      url.searchParams.append('include_details', 'true');
-    }
-
+    if (includeDetails) url.searchParams.append('include_details', 'true');
     const response = await fetch(url.toString());
-    const result = await handleResponse<{
-      schedule: any[];
-      summary?: any;
-    }>(response);
-
+    const result = await handleResponse<any>(response);
+    console.log(result)
     return {
-      schedule: result.schedule.map(task => ({
-        orderId: task.orderId ,
-        step: task.step,
-        startTime: new Date(task.startTime),
-        endTime: new Date(task.endTime),
-        resources: task.resources,
-        batchSize: task.batchSize,
-        status: task.status
-      })),
-      summary: result.summary ? {
-        total_orders: result.summary.total_orders,
-        total_tasks: result.summary.total_tasks,
-        resource_utilization: result.summary.resource_utilization
-      } : undefined
+      schedule: result.schedule.map(transformScheduledTask),
+      summary: result.summary
     };
   },
 
@@ -255,7 +152,6 @@ export const bakeryApi = {
   getBakerTasks: async (date: string, baker: string): Promise<{ tasks: BakerTask[] }> => {
     const response = await fetch(`${API_BASE_URL}/baker/${baker}?date=${date}`);
     const result = await handleResponse<{ tasks: any[] }>(response);
-    
     return {
       tasks: result.tasks.map(task => ({
         id: task.id,
@@ -280,12 +176,9 @@ export const bakeryApi = {
   ): Promise<BakerTask> => {
     const response = await fetch(`${API_BASE_URL}/baker/${baker}/tasks/${taskId}/status`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
-    
     const result = await handleResponse<any>(response);
     return {
       id: result.id,
