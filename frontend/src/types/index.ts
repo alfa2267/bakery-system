@@ -1,8 +1,45 @@
 // src/types/index.ts
 
+// Basic interfaces
+export interface Product {
+  id: number;
+  name: string;
+}
+
+export interface Ingredient {
+  name: string;
+  unit: string;
+  qty: string;
+}
+
+// Step interface matching JSON structure
+export interface Step {
+  id: string;
+  name: 'mixing' | 'chilling' | 'shaping' | 'baking' | 'cooling' | 'proofing';
+  duration: number;
+  requiresHuman: boolean;
+  requiresOven: boolean;
+  requiresMixer: boolean;
+  mustFollowImmediately: boolean;
+  scalingFactor?: number;
+}
+
+// Recipe interface matching JSON structure
+export interface Recipe {
+  id: number;
+  product: Product;
+  ingredients: Ingredient[];
+  steps: Step[];
+  requiresChilling: boolean;
+  maxChillTime: number;
+  minBatchSize: number;
+  maxBatchSize: number;
+  unit: string;
+}
+
 // Order-related interfaces
 export interface OrderItem {
-  product: string;
+  product: Product;
   quantity: number;
 }
 
@@ -19,43 +56,9 @@ export interface Order {
   updated_at?: string;
 }
 
-// Explicit type for order statuses to ensure type safety
 export type OrderStatus = 'new' | 'pending' | 'in-progress' | 'completed' | 'cancelled';
 
-// Production and Scheduling Types
-export type ProductionStep = 'mixing' | 'chilling' | 'shaping' | 'baking' | 'cooling';
-
-export interface Ingredient {
-  name: string;  // Name of the ingredient (e.g., "eggs")
-  unit: string;  // Unit of measurement (e.g., "kg")
-  qty: string;   // Quantity of the ingredient (e.g., "0.3")
-}
-
-export interface Step {
-  id: string;               // Unique identifier for the step
-  name: ProductionStep;     // Name of the step (mixing, chilling, etc.)
-  duration?: number;        // Duration in minutes (e.g., 25 minutes)
-  requiresHuman?: boolean;  // Whether a human is needed for the step
-  requiresOven?: boolean;   // Whether the step requires an oven
-  requiresMixer?: boolean;  // Whether the step requires a mixer
-  mustFollowImmediately?: boolean; // Whether this step must be followed immediately
-  scalingFactor?: number;   // Scaling factor for the recipe (optional)
-}
-
-export interface Recipe {
-  id: number;               // Unique identifier for the recipe (e.g., 1001)
-  product: {
-    id: number;             // Product ID (e.g., 23)
-    name: string;           // Product name (e.g., "cookies")
-  };
-  ingredients: Ingredient[];  // List of ingredients for the recipe
-  steps: Step[];              // List of steps required to make the product
-  requiresChilling: boolean;  // Whether the recipe requires chilling
-  maxChillTime: number;       // Maximum chilling time in minutes (e.g., 240)
-  minBatchSize: number;       // Minimum batch size (e.g., 6)
-  maxBatchSize: number;       // Maximum batch size (e.g., 12)
-  unit: string;               // Unit of the product (e.g., "whole")
-}
+export type ProductionStep = 'mixing' | 'chilling' | 'shaping' | 'baking' | 'cooling' | 'proofing';
 
 // Scheduling and Task-related Interfaces
 export interface ScheduledTask {
@@ -72,7 +75,6 @@ export interface ScheduledTask {
   productName?: string;
 }
 
-// Explicit type for task statuses
 export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'blocked';
 
 export interface BakerTask {
@@ -150,6 +152,7 @@ export const STEP_COLORS: Record<ProductionStep, string> = {
   shaping: 'bg-orange-500',
   baking: 'bg-red-500',
   cooling: 'bg-green-500',
+  proofing: 'bg-yellow-500'
 };
 
 export const STEP_HOVER_COLORS: Record<ProductionStep, string> = {
@@ -158,6 +161,7 @@ export const STEP_HOVER_COLORS: Record<ProductionStep, string> = {
   shaping: 'group-hover:bg-orange-600',
   baking: 'group-hover:bg-red-600',
   cooling: 'group-hover:bg-green-600',
+  proofing: 'group-hover:bg-yellow-600'
 };
 
 export const VIEW_MODES: Record<ViewMode, ViewModeConfig> = {
@@ -210,4 +214,8 @@ export const VIEW_MODES: Record<ViewMode, ViewModeConfig> = {
     columnWidth: 400,
     label: (date: Date) => date.toLocaleDateString([], { month: 'short' })
   }
+};
+
+export const formatDateToISO = (date: Date): string => {
+  return date.toISOString();
 };

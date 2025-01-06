@@ -5,3 +5,5 @@ from .database import init_db
 # Just export necessary items, don't initialize here
 from .database import Base, engine, SessionLocal, get_db
 from .models import OrderDB, OrderItemDB, ScheduledTaskDB
+
+#uvicorn app.main:app --reload --port 8000

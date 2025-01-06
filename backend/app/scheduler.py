@@ -16,49 +16,28 @@ class BakeryScheduler:
         self.orders = []
         self.schedule = []
 
-    def _load_recipes(self) -> Dict[str, Recipe]:
+
+
+    def _load_recipes(self) -> Dict[int, Recipe]:
         """Load recipes from JSON file"""
         try:
             logger.info(f"Loading recipes from {self.recipes_path}")
             with open(self.recipes_path, 'r') as f:
-                recipe_data = json.load(f)
+                recipes_data = json.load(f)
+                
+            # Convert list to dictionary with recipe ID as key
+            recipes = {}
+            for recipe_data in recipes_data:
+                recipe = Recipe(**recipe_data)
+                recipes[recipe.id] = recipe
+                
             logger.info("Recipes loaded successfully")
-        except FileNotFoundError:
-            logger.error(f"Recipe file not found at {self.recipes_path}")
-            raise FileNotFoundError(f"Recipe file not found at {self.recipes_path}")
-        except json.JSONDecodeError:
-            logger.error("Invalid JSON format in recipe file")
-            raise ValueError("Invalid JSON format in recipe file")
+            return recipes
+        except Exception as e:
+            logger.error(f"Error loading recipes: {str(e)}")
+            raise
 
-        recipes = {}
-        for product_type, recipe_info in recipe_data.items():
-            try:
-                steps = [
-                    ProductionStep(
-                        name=step['name'],
-                        duration=step['duration'],
-                        requiresHuman=step['requiresHuman'],
-                        requiresOven=step['requiresOven'],
-                        requiresMixer=step['requiresMixer'],
-                        mustFollowImmediately=step['mustFollowImmediately'],
-                        scalingFactor=step.get('scalingFactor', 1.0)
-                    )
-                    for step in recipe_info['steps']
-                ]
-            except KeyError as e:
-                logger.error(f"Missing required key {e} in recipe for {product_type}")
-                raise
 
-            recipes[product_type] = Recipe(
-                productType=recipe_info['productType'],
-                steps=steps,
-                requiresChilling=recipe_info['requiresChilling'],
-                maxChillTime=recipe_info['maxChillTime'],
-                minBatchSize=recipe_info['minBatchSize'],
-                maxBatchSize=recipe_info['maxBatchSize']
-            )
-
-        return recipes
 
     def validate_order(self, order: Order) -> Tuple[bool, List[str]]:
         warnings = []
@@ -101,58 +80,73 @@ class BakeryScheduler:
 
         return is_valid, warnings
 
+
+
     def get_available_products(self) -> List[Dict]:
         """Return list of available products and their constraints"""
-        available_products = [
-            {
-                "product": product_type,
-                "minBatchSize": recipe.minBatchSize,
-                "maxBatchSize": recipe.maxBatchSize,
-                "requiresChilling": recipe.requiresChilling,
-                "totalProductionTime": sum(step.duration for step in recipe.steps)
-            }
-            for product_type, recipe in self.recipes.items()
-        ]
-        logger.info(f"Available products: {', '.join([prod['product'] for prod in available_products])}")
-        return available_products
-        
+        try:
+            available_products = [
+                {
+                    "product": {
+                        "id": recipe.product.id,
+                        "name": recipe.product.name
+                    },
+                    "minBatchSize": recipe.minBatchSize,
+                    "maxBatchSize": recipe.maxBatchSize,
+                    "requiresChilling": recipe.requiresChilling,
+                    "totalProductionTime": sum(step.duration for step in recipe.steps)
+                }
+                for recipe in self.recipes.values()
+            ]
+            
+            # Log product names properly by accessing the nested name field
+            product_names = [prod['product']['name'] for prod in available_products]
+            logger.info(f"Available products: {', '.join(product_names)}")
+            
+            return available_products
+            
+        except Exception as e:
+            logger.error(f"Error getting available products: {str(e)}")
+            logger.error(traceback.format_exc())
+            raise
+
+
+
 
     def schedule_order(self, order: Order) -> List[ScheduledTask]:
         tasks = []
         current_time = datetime.now()  # Start scheduling from now
 
         for item in order.items:
-            for step in self.get_recipe_steps(item.product):  # Iterate through each product's steps
-                # Get the required resources dynamically
-                resources = self._get_required_resources(step)
+            batches = self._calculate_batches(item.quantity, self.recipes[item.product])
 
-                # Calculate start_time and end_time for the step
-                end_time = current_time + timedelta(minutes=step.duration)
-                start_time = current_time
+            for batch_size in batches:
+                for step in self.get_recipe_steps(item.product):  # Iterate through each product's steps
+                    # Get the required resources dynamically
+                    resources = self._get_required_resources(step)
 
-                task = ScheduledTask(
-                    orderId=order.id,
-                    orderItemId=item.id,  # Add the item ID here
-                    orderItemName=item.product,  # Add the item name here
-                    step=step.name,
-                    startTime=start_time,
-                    endTime=end_time,
-                    resources=resources,  # Assign the resources
-                    batchSize=item.quantity,  # Use item.quantity for the batch size
-                    status="pending",
-                    product=item.product  # Use the product from the item
-                )
-                tasks.append(task)
+                    # Calculate start_time and end_time for the step
+                    end_time = current_time + timedelta(minutes=step.duration)
+                    start_time = current_time
 
-                # Update current_time for the next step in the batch
-                current_time = end_time
+                    task = ScheduledTask(
+                        orderId=order.id,
+                        orderItemId=item.id,  # Add the item ID here
+                        orderItemName=item.product,  # Add the item name here
+                        step=step.name,
+                        startTime=start_time,
+                        endTime=end_time,
+                        resources=resources,  # Assign the resources
+                        batchSize=batch_size,  # Use calculated batch size
+                        status="pending",
+                        product=item.product  # Use the product from the item
+                    )
+                    tasks.append(task)
+
+                    # Update current_time for the next step in the batch
+                    current_time = end_time
 
         return tasks
-
-
-
-
-
 
     def _calculate_batches(self, quantity: int, recipe: Recipe) -> List[int]:
         """Calculate optimal batch sizes"""
@@ -184,60 +178,10 @@ class BakeryScheduler:
             resources.append("mixer")
         return resources
 
-    def _schedule_batches(
-        self,
-        batches: List[int],
-        recipe: Recipe,
-        delivery_time: datetime,
-        order_id: str
-    ) -> List[ScheduledTask]:
-        tasks = []
-        current_time = delivery_time
-
-        for batch_size in batches:
-            batch_tasks = []
-
-            for step in reversed(recipe.steps):
-                end_time = current_time
-                start_time = end_time - timedelta(minutes=step.duration)
-
-                task = ScheduledTask(
-                    orderId=order_id,
-                    step=step.name,
-                    startTime=start_time,
-                    endTime=end_time,
-                    resources=self._get_required_resources(step),
-                    batchSize=batch_size,
-                    productName=recipe.productType
-                )
-                batch_tasks.append(task)
-
-                if step.mustFollowImmediately and len(recipe.steps) > 1:
-                    current_time = start_time
-                else:
-                    current_time = self._find_available_time(
-                        start_time,
-                        step,
-                        batch_size
-                    )
-
-            tasks.extend(reversed(batch_tasks))
-
-        logger.debug(f"Scheduled {len(tasks)} tasks for order {order_id}")
-        return tasks
-
-    def _find_available_time(
-        self,
-        desired_time: datetime,
-        step: ProductionStep,
-        batch_size: int
-    ) -> datetime:
-        return desired_time
-
-    def get_recipe_steps(self, product_type: str) -> List[ProductionStep]:
+    def get_recipe_steps(self, product_id: int) -> List[ProductionStep]:
         """Retrieve the recipe steps for a specific product."""
-        recipe = self.recipes.get(product_type)
+        recipe = self.recipes.get(product_id)
         if not recipe:
-            logger.error(f"Recipe for product {product_type} not found.")
-            raise ValueError(f"Recipe for product {product_type} not found.")
+            logger.error(f"Recipe for product ID {product_id} not found.")
+            raise ValueError(f"Recipe for product ID {product_id} not found.")
         return recipe.steps

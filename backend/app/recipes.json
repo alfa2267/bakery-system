@@ -49,7 +49,7 @@
     ],
     "requiresChilling": true,
     "maxChillTime": 240,
-    "minBatchSize": 6,
+    "minBatchSize": 3,
     "maxBatchSize": 12,
     "unit": "whole"
   },

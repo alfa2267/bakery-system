@@ -3,8 +3,8 @@ import {
   ValidationResponse, 
   ScheduledTask,
   BakerTask,
-  parseDateString,
-  transformScheduledTask
+  transformScheduledTask,
+  Recipe
 } from '../types';
 
 const API_BASE_URL = (() => {
@@ -41,6 +41,10 @@ interface ConfigResponse {
   };
 }
 
+interface RecipesResponse {
+  recipes: Recipe[];
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     try {
@@ -50,7 +54,14 @@ async function handleResponse<T>(response: Response): Promise<T> {
       throw new Error(`HTTP error! status: ${response.status}, ${response.statusText}`);
     }
   }
-  return response.json();
+  try {
+    const data = await response.json();
+    console.log('API Response:', data); // Debug log
+    return data;
+  } catch (error) {
+    console.error('Error parsing response:', error);
+    throw new Error('Invalid response format');
+  }
 }
 
 export const bakeryApi = {
@@ -58,7 +69,7 @@ export const bakeryApi = {
     const transformedOrder = {
       id: order.id,
       customer_name: order.customerName,
-      status: order.status || 'new', // Default status is 'new'
+      status: order.status || 'new',
       created_at: order.created_at || new Date().toISOString(),
       updated_at: order.updated_at || new Date().toISOString(),
       delivery_date: order.deliveryDate,
@@ -66,7 +77,10 @@ export const bakeryApi = {
       location: order.location,
       estimated_travel_time: order.estimatedTravelTime,
       items: order.items?.map(item => ({
-        product: item.product,
+        product: {
+          name: item.product.name, 
+          id: item.product.id
+        },
         quantity: item.quantity
       }))
     };
@@ -79,7 +93,11 @@ export const bakeryApi = {
     return handleResponse<ValidationResponse>(response);
   },
 
-  createOrder: async (order: Order): Promise<{ orderId: string, tasks: ScheduledTask[] }> => {
+  createOrder: async (order: Order): Promise<{
+    status: number; 
+    orderId: string;
+    tasks: ScheduledTask[];
+  }> => {
     const transformedOrder = {
       id: order.id,
       customer_name: order.customerName,
@@ -91,7 +109,10 @@ export const bakeryApi = {
       location: order.location,
       estimated_travel_time: order.estimatedTravelTime,
       items: order.items.map(item => ({
-        product: item.product,
+        product: {
+          name: item.product.name, 
+          id: item.product.id
+        },
         quantity: item.quantity
       }))
     };
@@ -102,10 +123,11 @@ export const bakeryApi = {
       body: JSON.stringify(transformedOrder),
     });
     
-    const result = await handleResponse<{ orderId: string, tasks: any[] }>(response);
+    const result = await handleResponse<{ orderId: string; tasks: ScheduledTask[] }>(response);
     return {
       orderId: result.orderId,
-      tasks: result.tasks.map(transformScheduledTask)
+      status: response.status,
+      tasks: result.tasks
     };
   },
 
@@ -114,7 +136,7 @@ export const bakeryApi = {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
     });
-    const result = await handleResponse<any>(response);
+    const result = await handleResponse<{ orders: any[] }>(response);
     return result.orders.map((order: any) => ({
       id: order.id,
       customerName: order.customer_name,
@@ -126,7 +148,10 @@ export const bakeryApi = {
       location: order.location,
       estimatedTravelTime: order.estimated_travel_time,
       items: order.items.map((item: any) => ({
-        product: item.product,
+        product: {
+          name: item.product.name, 
+          id: item.product.id
+        },
         quantity: item.quantity
       }))
     }));
@@ -136,12 +161,7 @@ export const bakeryApi = {
     const url = new URL(`${API_BASE_URL}/schedule/${date}`);
     if (includeDetails) url.searchParams.append('include_details', 'true');
     const response = await fetch(url.toString());
-    const result = await handleResponse<any>(response);
-    console.log(result)
-    return {
-      schedule: result.schedule.map(transformScheduledTask),
-      summary: result.summary
-    };
+    return handleResponse<ScheduleResponse>(response);
   },
 
   getConfig: async (): Promise<ConfigResponse> => {
@@ -179,30 +199,34 @@ export const bakeryApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
-    const result = await handleResponse<any>(response);
-    return {
-      id: result.id,
-      time: new Date(result.time),
-      action: result.action,
-      details: result.details,
-      equipment: result.equipment,
-      status: result.status,
-      dependencies: result.dependencies?.map((dep: any) => ({
-        from: dep.from,
-        what: dep.what,
-        urgent: dep.urgent
-      }))
-    };
+    const result = await handleResponse<BakerTask>(response);
+    return result;
   },
 
-  getAvailableRecipes: async (): Promise<Array<{
-    product: string;
-    minBatchSize: number;
-    maxBatchSize: number;
-    requiresChilling: boolean;
-    totalProductionTime: number;
-  }>> => {
-    const response = await fetch(`${API_BASE_URL}/debug/recipes`);
-    return handleResponse<any[]>(response);
+  getAvailableRecipes: async (): Promise<Recipe[]> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/recipes`);
+      const data = await handleResponse<RecipesResponse>(response);
+      
+      console.log(data.recipes)
+
+      // Check if we have recipes array and return it
+      if (data && Array.isArray(data.recipes)) {
+        console.log('Recipes fetched:', data.recipes);
+        return data.recipes;
+      }
+      
+      // If data is an array directly (fallback)
+      if (Array.isArray(data)) {
+        console.log('Recipes fetched (direct array):', data);
+        return data;
+      }
+      
+      console.error('Invalid recipes data structure:', data);
+      throw new Error('Invalid recipes data structure');
+    } catch (error) {
+      console.error('Error fetching recipes:', error);
+      throw error;
+    }
   }
 };

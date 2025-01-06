@@ -241,8 +241,8 @@ const OrderView: React.FC = () => {
                   <TableCell>
                     <div className="space-y-1">
                       {order.items.map((item) => (
-                        <div key={item.product} className="text-sm">
-                          {item.product}: {item.quantity}
+                        <div key={item.product.id} className="text-sm">
+                          {item.product.id}: {item.quantity}
                         </div>
                       ))}
                     </div>

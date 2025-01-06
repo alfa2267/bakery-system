@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -7,11 +8,12 @@ from sqlalchemy.exc import SQLAlchemyError
 import uuid
 import logging
 import traceback
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from .models import (
     Order, ValidationResponse, ScheduleResponse,
-    DailyScheduleSummary, ResourceUtilization, ScheduledTask
+    DailyScheduleSummary, ResourceUtilization, ScheduledTask,
+    Recipe, Product, ProductionStep, Ingredient  # Removed Step since it's not needed
 )
 from .scheduler import BakeryScheduler
 from .config import settings
@@ -24,7 +26,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,11 +49,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 origins = [
-        "*",  # Be careful in production
-        "https://localhost:3000",
-        "https://*.app.github.dev",
-        "https://fluffy-cod-wr6xg46jp9429j6j-3000.app.github.dev"
-        ]
+    "*",  # Be careful in production
+    "https://localhost:3000",
+    "https://*.app.github.dev",
+    "https://fluffy-cod-wr6xg46jp9429j6j-3000.app.github.dev"
+]
 
 app.add_middleware(
     CORSMiddleware,
@@ -65,28 +66,18 @@ app.add_middleware(
 # Initialize scheduler
 scheduler = BakeryScheduler()
 
-
 @app.get("/manifest.json")
 async def get_manifest():
     return FileResponse("./frontend/public/manifest.json")
 
 @app.post("/orders/validate")
 async def validate_order(order: Order) -> ValidationResponse:
-    """
-    Validate an order before creation
-    """
+    """Validate an order before creation"""
     try:
         logger.info(f"Validating order: {order}")
-        
-        # Use the scheduler to validate the order
         is_valid, warnings = scheduler.validate_order(order)
-        
         logger.info(f"Validation result: valid={is_valid}, warnings={warnings}")
-        
-        return ValidationResponse(
-            isValid=is_valid, 
-            warnings=warnings
-        )
+        return ValidationResponse(isValid=is_valid, warnings=warnings)
     except Exception as e:
         logger.error(f"Error during order validation: {str(e)}")
         logger.error(traceback.format_exc())
@@ -95,7 +86,6 @@ async def validate_order(order: Order) -> ValidationResponse:
 @app.post("/orders")
 async def create_order(order: Order, db: Session = Depends(get_db)) -> ScheduleResponse:
     logger.info(f"Received order creation request: {order}")
-    
     try:
         # Validate first
         is_valid, warnings = scheduler.validate_order(order)
@@ -122,10 +112,6 @@ async def create_order(order: Order, db: Session = Depends(get_db)) -> ScheduleR
                 logger.error(f"Database error while saving order: {str(e)}")
                 logger.error(traceback.format_exc())
                 raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-            
-            # Include product/item details in the scheduled tasks
-            for task in scheduled_tasks:
-                task.product = order.product  # Assuming `product` is a field in the `Order` model
             
             return ScheduleResponse(
                 orderId=db_order.id,
@@ -174,7 +160,7 @@ async def get_schedule(
                     resources=task.resources,
                     batchSize=task.batch_size,
                     status=task.status or 'pending',
-                    productName=task.product_name  # Correct field reference
+                    productName=task.product_name
                 )
                 for task in db_tasks
             ]
@@ -210,12 +196,8 @@ async def get_schedule(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching the schedule")
 
-
 def _calculate_resource_utilization(tasks: List[ScheduledTask]) -> List[ResourceUtilization]:
-    """
-    Calculate resource utilization based on scheduled tasks
-    """
-    # Aggregate resources from all tasks
+    """Calculate resource utilization based on scheduled tasks"""
     all_resources = set()
     for task in tasks:
         all_resources.update(task.resources)
@@ -224,17 +206,14 @@ def _calculate_resource_utilization(tasks: List[ScheduledTask]) -> List[Resource
     total_minutes = 24 * 60  # Total minutes in a day
     
     for resource in all_resources:
-        # Find tasks using this resource
         resource_tasks = [task for task in tasks if resource in task.resources]
         
         if resource_tasks:
-            # Calculate total busy time for this resource
             busy_minutes = sum(
                 (task.endTime - task.startTime).total_seconds() / 60 
                 for task in resource_tasks
             )
             
-            # Calculate utilization percentage
             utilization_percentage = (busy_minutes / total_minutes) * 100
             
             resource_utilization.append(
@@ -248,17 +227,28 @@ def _calculate_resource_utilization(tasks: List[ScheduledTask]) -> List[Resource
     
     return resource_utilization
 
-# Optional debug endpoint to list available recipes
-@app.get("/debug/recipes")
+@app.get("/recipes")
 async def get_available_recipes():
-    """Endpoint to list available recipes for debugging"""
+    """Endpoint to list available recipes"""
     try:
-        recipes = scheduler.get_available_products()
-        return {"recipes": recipes}
+        # Get recipes from scheduler
+        scheduler_recipes = scheduler.get_available_products()
+        logger.debug(f"Found {len(scheduler_recipes)} recipes")
+        
+        # Convert dictionary to list
+        recipes_list = list(scheduler_recipes)
+        logger.debug(f"Converted to list of {len(recipes_list)} recipes")
+        
+        return {"recipes": recipes_list}
+        
     except Exception as e:
         logger.error(f"Error fetching recipes: {str(e)}")
-        raise HTTPException(status_code=500, detail="Could not fetch recipes")
-    
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not fetch recipes: {str(e)}"
+        )
+
 @app.get("/baker/{baker_name}")
 async def get_items_for_baker(baker_name: str):
     """Endpoint to retrieve all items associated with a specific baker"""

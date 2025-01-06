@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Order, OrderItem, Recipe } from '../types';
+import { Order, OrderItem, Recipe, Product } from '../types';
 import Alert from '../ui/Alert';
-
-// Import recipes from bakeryApi
 import { bakeryApi } from '../api/bakeryApi';
 
 const OrderForm: React.FC = () => {
@@ -13,178 +11,151 @@ const OrderForm: React.FC = () => {
     location: '',
     items: [],
     estimatedTravelTime: 30,
+    status: 'new'  // Adding default status based on OrderStatus type
   });
 
-  const [recipesData, setRecipesData] = useState<Recipe[] | null>(null);
+  const [recipesData, setRecipesData] = useState<Recipe[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isValid, setIsValid] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const timeSlotMapping: { [key: string]: string } = {
-    '1': '10:00-12:00',
-    '2': '12:00-14:00',
-    '3': '14:00-16:00',
-    '4': '16:00-17:30',
-  };
+  // Validate form data
+  useEffect(() => {
+    const isFormValid = Boolean(
+      formData.customerName &&
+      formData.deliveryDate &&
+      formData.deliverySlot &&
+      formData.location &&
+      formData.items?.some(item => item.quantity > 0)
+    );
+    
+    setWarnings(prev => isFormValid ? [] : prev);
+    setIsValid(isFormValid);
+  }, [formData]);
+  
+
 
   useEffect(() => {
     const fetchRecipes = async () => {
+      setIsLoading(true);
       try {
-        const fetchedRecipes = await bakeryApi.getAvailableRecipes();
-        console.log('Fetched Recipes:', fetchedRecipes); // Log the API response
-        if (Array.isArray(fetchedRecipes)) {
-          setRecipesData(fetchedRecipes);
-          const defaultItems: Recipe[] = fetchedRecipes.map(item => ({
-            product: item.product,
-            quantity: 0,
-          }));
-          setFormData((prevData) => ({ ...prevData, items: defaultItems }));
-        } else {
-          setWarnings(['Invalid data format received from recipes.']);
+        const response = await bakeryApi.getAvailableRecipes();
+        console.log('Raw API response:', response); // Debug log
+        
+        // Ensure we have an array of recipes
+        if (!response || !Array.isArray(response)) {
+          console.error('Invalid recipes response:', response);
+          throw new Error('Invalid recipes data received');
         }
+
+        console.log('Number of recipes received:', response.length); // Debug log
+        
+        setRecipesData(response);
+        
+        // Set default items based on fetched recipes
+        const defaultItems: OrderItem[] = response.map((recipe: Recipe) => {
+          console.log('Creating default item for recipe:', recipe.product.name); // Debug individual recipes
+          return {
+            product: {
+              id: recipe.product.id,
+              name: recipe.product.name
+            },
+            quantity: recipe.minBatchSize || 0,
+          };
+        });
+
+        console.log('Default items created:', defaultItems); // Debug log
+
+        setFormData(prevData => {
+          const newData = { ...prevData, items: defaultItems };
+          console.log('Updated form data:', newData); // Debug log
+          return newData;
+        });
       } catch (error) {
-        setWarnings(['Error fetching recipes. Please try again.']);
+        console.error('Error fetching recipes:', error);
+        setWarnings(prev => [...prev, 'Failed to load recipes. Please try again.']);
+        setRecipesData([]); // Set empty array instead of null on error
+      } finally {
+        setIsLoading(false);
       }
     };
-    
 
     fetchRecipes();
-  }, []);
+  }, [])
 
-  const handleItemChange = (index: number, quantity: number) => {
-    if (!formData.items || !recipesData) return;
 
-    const updatedItems = [...formData.items];
-    const recipe = recipesData[index];
-    updatedItems[index] = {
-      ...updatedItems[index],
-      quantity: Math.max(0, Math.min(quantity, recipe.maxBatchSize)),
-    };
 
-    setFormData({ ...formData, items: updatedItems });
+  const handleItemChange = (productId: number, quantity: number) => {
+    const updatedItems = formData.items?.map(item =>
+      item.product.id === productId ? { ...item, quantity } : item
+    );
+    setFormData((prevData) => ({
+      ...prevData,
+      items: updatedItems,
+    }));
   };
-
-  const validateOrder = async () => {
-    try {
-      // Check if we have all required fields
-      if (!formData.customerName || !formData.deliveryDate || !formData.deliverySlot || !formData.location) {
-        setIsValid(false);
-        return;
-      }
-
-      // Filter out items with 0 quantity
-      const validItems = formData.items?.filter(item => item.quantity > 0) || [];
-
-      // Don't validate if no items are selected
-      if (validItems.length === 0) {
-        setWarnings(['Please select at least one item']);
-        setIsValid(false);
-        return;
-      }
-
-      // Prepare data for validation
-      const orderData: Partial<Order> = {
-        id: crypto.randomUUID(),
-        customerName: formData.customerName,
-        status: 'new',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        deliveryDate: formData.deliveryDate,
-        deliverySlot: timeSlotMapping[formData.deliverySlot] || '',
-        location: formData.location,
-        estimatedTravelTime: formData.estimatedTravelTime,
-        items: validItems,
-      };
-
-      const response = await bakeryApi.validateOrder(orderData);
-      setWarnings(response.warnings || []);
-      setIsValid(response.isValid);
-    } catch (error) {
-      console.error('Validation error:', error);
-      setWarnings(['Error validating order. Please check your input and try again.']);
-      setIsValid(false);
-    }
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (formData.customerName &&
-        formData.deliveryDate &&
-        formData.deliverySlot &&
-        formData.location &&
-        formData.items?.some(item => item.quantity > 0)) {
-        validateOrder();
-      }
-    }, 500); // Add debounce
-
-    return () => clearTimeout(timer);
-  }, [formData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValid || !formData.items) return;
+    if (!isValid) {
+      setWarnings(['Please fill out all required fields.']);
+      return;
+    }
 
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
-      const validItems = formData.items.filter(item => item.quantity > 0);
-
-      if (validItems.length === 0) {
-        setWarnings(['Please select at least one item']);
-        return;
-      }
-
       const orderData: Order = {
-        id: crypto.randomUUID(),
-        customerName: formData.customerName!,
+        ...formData as Required<Omit<Order, 'id' | 'created_at' | 'updated_at'>>,
         status: 'new',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        deliveryDate: formData.deliveryDate!,
-        deliverySlot: timeSlotMapping[formData.deliverySlot!]!,
-        location: formData.location!,
-        estimatedTravelTime: formData.estimatedTravelTime!,
-        items: validItems,
+        id: ''
       };
 
+      console.log(recipesData);
+
       const response = await bakeryApi.createOrder(orderData);
-      console.log('Order created:', response);
-
-      // Show success message
-      setSubmitSuccess(true);
-
-      // Reset form
-      setFormData({
-        customerName: '',
-        deliveryDate: '',
-        deliverySlot: '',
-        location: '',
-        items: [],
-        estimatedTravelTime: 30,
-      });
-      setWarnings([]);
-      setIsValid(false);
-
-      // Hide success message after 3 seconds
-      setTimeout(() => setSubmitSuccess(false), 3000);
+      if (response.status === 200) {
+        setSubmitSuccess(true);
+        // Reset form after successful submission
+        setFormData({
+          customerName: '',
+          deliveryDate: '',
+          deliverySlot: '',
+          location: '',
+          items: recipesData?.map(recipe => ({
+            product: {
+              id: recipe.product.id,
+              name: recipe.product.name
+            },
+            quantity: recipe.minBatchSize || 0,
+          })) || [],
+          estimatedTravelTime: 30,
+          status: 'new'
+        });
+      }
     } catch (error) {
-      console.error('Error creating order:', error);
-      setWarnings(['Error creating order. Please try again.']);
+      console.error('Error submitting order:', error);
+      setWarnings(['Failed to submit order. Please try again.']);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 text-center">
+        <p>Loading recipes...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">Place New Order</h2>
 
       {submitSuccess && (
-        <Alert 
-          variant="success"
-          title="Success"
-          className="mb-4"
-        >
+        <Alert variant="success" title="Success" className="mb-4">
           Order created successfully!
         </Alert>
       )}
@@ -246,54 +217,82 @@ const OrderForm: React.FC = () => {
           />
         </div>
 
+        
+        
         {/* Order Items */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-700">Order Items</h3>
+          
+          {/* Debug output */}
+          <div className="text-sm text-gray-500 mb-2">
+            Total Recipes: {recipesData.length}
+          </div>
 
-          <table className="min-w-full table-auto border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Product</th>
-                <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Quantity</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recipesData?.map((recipe, index) => (
-                <tr key={recipe.id}>
-                  <td className="px-4 py-2 text-sm text-gray-700">{recipe.product}</td>
-                  <td className="px-4 py-2">
-                    <input
-                      type="number"
-                      value={formData.items?.[index]?.quantity || 0}
-                      min={0}
-                      max={recipe.maxBatchSize}
-                      onChange={(e) => handleItemChange(index, parseInt(e.target.value, 10))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="grid grid-cols-1 gap-4">
+            {recipesData.map((recipe) => {
+              // Debug log for each recipe
+              console.log('Rendering recipe:', recipe);
+              
+              const currentQuantity = formData.items?.find(
+                item => item.product.id === recipe.product.id
+              )?.quantity || 0;
+
+              return (
+                <div key={recipe.product.id} className="border p-4 rounded-lg">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {recipe.product.name}
+                      </label>
+                      <span className="text-xs text-gray-500">
+                        {recipe.product.id}
+                      </span>
+                    </div>
+                    <div className="w-1/3">
+                      <input
+                        type="number"
+                        value={recipe.minBatchSize}
+                        onChange={(e) => handleItemChange(recipe.product.id, parseInt(e.target.value, 10))}
+                        min={recipe.minBatchSize || 0}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                  {recipe.ingredients && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      Ingredients: {recipe.ingredients.map(ing => ing.name).join(', ')}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
+
+
 
         {/* Warnings */}
         {warnings.length > 0 && (
-          <div className="bg-yellow-100 text-yellow-800 p-4 rounded-md">
-            <ul>
-              {warnings.map((warning, index) => (
-                <li key={index} className="text-sm">{warning}</li>
-              ))}
-            </ul>
+          <div className="space-y-2">
+            {warnings.map((warning, index) => (
+              <Alert key={index} variant="warning" className="flex items-center">
+                {warning}
+              </Alert>
+            ))}
           </div>
         )}
 
+        {/* Submit Button */}
         <button
           type="submit"
           disabled={!isValid || isSubmitting}
-          className="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`w-full py-2 px-4 rounded-md font-semibold transition-colors duration-200 ${
+            isValid && !isSubmitting
+              ? 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
         >
-          {isSubmitting ? 'Submitting...' : 'Submit Order'}
+          {isSubmitting ? 'Creating Order...' : 'Place Order'}
         </button>
       </form>
     </div>

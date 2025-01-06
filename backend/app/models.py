@@ -22,6 +22,47 @@ class OrderItemDB(Base):
     order = relationship("OrderDB", back_populates="items")
     tasks = relationship("ScheduledTaskDB", back_populates="order_item", cascade="all, delete-orphan")  # Added reverse relationship
 
+  
+  
+class Product(BaseModel):
+    id: int
+    name: str
+
+class ProductionStep(BaseModel):
+    id: Optional[str] = None
+    name: str
+    duration: int = Field(gt=0)
+    requiresHuman: bool
+    requiresOven: bool
+    requiresMixer: bool
+    mustFollowImmediately: bool
+    scalingFactor: Optional[float] = Field(gt=0.0, default=1.0)
+
+class Ingredient(BaseModel):
+    name: str
+    unit: str
+    qty: str
+
+class Recipe(BaseModel):
+    id: int
+    product: Product
+    ingredients: List[Ingredient]
+    steps: List[ProductionStep]
+    requiresChilling: bool
+    maxChillTime: int = Field(ge=0)
+    minBatchSize: int = Field(gt=0)
+    maxBatchSize: int = Field(gt=0)
+    unit: str
+
+    @property
+    def total_duration(self) -> int:
+        return sum(step.duration for step in self.steps)
+
+    class Config:
+        from_attributes = True
+
+  
+
 class OrderDB(Base):
     __tablename__ = "orders"
     
@@ -57,11 +98,13 @@ class ScheduledTaskDB(Base):
 # Pydantic Models for API
 class OrderItem(BaseModel):
     id: str = str(uuid.uuid4()) 
-    product: str
+    product: Product  # Changed from str to Product
     quantity: int = Field(gt=0)  # Ensure quantity is greater than 0
 
     class Config:
         from_attributes = True
+
+
 
 class Order(BaseModel):
     id: str
@@ -78,26 +121,7 @@ class Order(BaseModel):
     class Config:
        from_attributes = True
        
-class ProductionStep(BaseModel):
-    name: str
-    duration: int = Field(gt=0)  # Must be positive
-    requiresHuman: bool
-    requiresOven: bool
-    requiresMixer: bool
-    mustFollowImmediately: bool
-    scalingFactor: float = Field(gt=0.0, default=1.0)  # Must be positive
 
-class Recipe(BaseModel):
-    productType: str
-    steps: List[ProductionStep] = Field(min_items=1)  # Must have at least one step
-    requiresChilling: bool
-    maxChillTime: int = Field(ge=0)  # Non-negative
-    minBatchSize: int = Field(gt=0)  # Must be positive
-    maxBatchSize: int = Field(gt=0)  # Must be positive
-
-    @property
-    def total_duration(self) -> int:
-        return sum(step.duration for step in self.steps)
 
 class ScheduledTask(BaseModel):
     orderId: str
@@ -145,3 +169,6 @@ class DailyScheduleSummary(BaseModel):
     resource_utilization: List[ResourceUtilization]
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+
+
+    
