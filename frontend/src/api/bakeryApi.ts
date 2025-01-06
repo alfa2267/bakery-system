@@ -1,9 +1,10 @@
 import { 
   Order, 
   ValidationResponse, 
-  ScheduledTask, 
-  BakerTask, 
-  parseDateString 
+  ScheduledTask,
+  BakerTask,
+  parseDateString,
+  transformScheduledTask
 } from '../types';
 
 const API_BASE_URL = 'http://localhost:8000';
@@ -13,12 +14,16 @@ interface ScheduleResponse {
   summary?: {
     total_orders: number;
     total_tasks: number;
-    // Add other summary fields as needed
+    resource_utilization: Array<{
+      resource: string;
+      utilization_percentage: number;
+      busy_minutes: number;
+      total_minutes: number;
+    }>;
   };
 }
 
 interface ConfigResponse {
-  // Define based on your backend config
   delivery_slots: Array<{id: string, time: string}>;
   business_hours: {
     store: { open: string, close: string };
@@ -31,29 +36,12 @@ interface ConfigResponse {
   };
 }
 
-// Transform raw API data to typed objects
-function transformScheduledTask(task: any): ScheduledTask {
-  return {
-    ...task,
-    startTime: parseDateString(task.startTime),
-    endTime: parseDateString(task.endTime)
-  };
-}
-
-function transformBakerTask(task: any): BakerTask {
-  return {
-    ...task,
-    time: parseDateString(task.time)
-  };
-}
-
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     try {
       const errorData = await response.json();
       throw new Error(errorData.detail || errorData.message || `HTTP error! status: ${response.status}`);
     } catch {
-      // If JSON parsing fails, use status text
       throw new Error(`HTTP error! status: ${response.status}, ${response.statusText}`);
     }
   }
@@ -61,25 +49,25 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export const bakeryApi = {
-
-
   validateOrder: async (order: Partial<Order>): Promise<ValidationResponse> => {
     // Transform the order to match the server's expected format
     const transformedOrder = {
-      // Convert frontend camelCase to backend snake_case
-      id: order.id || crypto.randomUUID(),
-      customer_name: order.customerName || '',
-      status: order.status || 'pending',
+      id: order.id,
+      customer_name: order.customerName,
+      status: order.status || 'new',
       created_at: order.created_at || new Date().toISOString(),
       updated_at: order.updated_at || new Date().toISOString(),
-      delivery_date: order.deliveryDate || '',
-      delivery_slot: order.deliverySlot || '',
-      location: order.location || '',
-      estimated_travel_time: order.estimatedTravelTime || 30,
-      items: order.items || []
+      delivery_date: order.deliveryDate,
+      delivery_slot: order.deliverySlot,
+      location: order.location,
+      estimated_travel_time: order.estimatedTravelTime,
+      items: order.items?.map(item => ({
+        product: item.product,
+        quantity: item.quantity
+      }))
     };
 
-    console.log('Sending order for validation:', transformedOrder);
+    console.log('Validating order:', transformedOrder);
 
     const response = await fetch(`${API_BASE_URL}/orders/validate`, {
       method: 'POST',
@@ -91,9 +79,7 @@ export const bakeryApi = {
     return handleResponse<ValidationResponse>(response);
   },
 
-  
-  
- createOrder: async (order: Order): Promise<{
+  createOrder: async (order: Order): Promise<{
     orderId: string;
     tasks: ScheduledTask[];
   }> => {
@@ -114,6 +100,8 @@ export const bakeryApi = {
       }))
     };
     
+    console.log('Creating order:', transformedOrder);
+
     const response = await fetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: {
@@ -127,7 +115,7 @@ export const bakeryApi = {
       tasks: any[];
     }>(response);
     
-    // Transform tasks to use Date objects
+    // Transform tasks from snake_case to camelCase and convert dates
     return {
       orderId: result.orderId,
       tasks: result.tasks.map(task => ({
@@ -140,23 +128,27 @@ export const bakeryApi = {
         status: task.status
       }))
     };
-  }
+  },
 
-
-
-getOrders: async (status?: string): Promise<Order[]> => {
-    const url = new URL(`${API_BASE_URL}/orders`);
-    /* if (status) {
-      url.searchParams.append('status', status); // Optional status filter
-    } */
-
-    const response = await fetch(url.toString());
+  getOrders: async (): Promise<Order[]> => {
+    const response = await fetch(`${API_BASE_URL}/orders`);
     const result = await handleResponse<{ orders: any[] }>(response);
-
-    // Return the orders after transforming them into the correct type
-    return result.orders.map((order) => ({
-      ...order,
-      // You can transform the order data here if needed
+    
+    // Transform orders from snake_case to camelCase
+    return result.orders.map(order => ({
+      id: order.id,
+      customerName: order.customer_name,
+      status: order.status,
+      created_at: order.created_at,
+      updated_at: order.updated_at,
+      deliveryDate: order.delivery_date,
+      deliverySlot: order.delivery_slot,
+      location: order.location,
+      estimatedTravelTime: order.estimated_travel_time,
+      items: order.items.map((item: any) => ({
+        product: item.product,
+        quantity: item.quantity
+      }))
     }));
   },
 
@@ -173,8 +165,20 @@ getOrders: async (status?: string): Promise<Order[]> => {
     }>(response);
 
     return {
-      schedule: result.schedule.map(transformScheduledTask),
-      summary: result.summary
+      schedule: result.schedule.map(task => ({
+        orderId: task.order_id,
+        step: task.step,
+        startTime: new Date(task.start_time),
+        endTime: new Date(task.end_time),
+        resources: task.resources,
+        batchSize: task.batch_size,
+        status: task.status
+      })),
+      summary: result.summary ? {
+        total_orders: result.summary.total_orders,
+        total_tasks: result.summary.total_tasks,
+        resource_utilization: result.summary.resource_utilization
+      } : undefined
     };
   },
 
@@ -183,17 +187,29 @@ getOrders: async (status?: string): Promise<Order[]> => {
     return handleResponse<ConfigResponse>(response);
   },
 
-  getBakerTasks: async (date: string, baker: 'Baker1' | 'Baker2'): Promise<{ tasks: BakerTask[] }> => {
-    const response = await fetch(`${API_BASE_URL}/baker/${baker}`);
+  getBakerTasks: async (date: string, baker: string): Promise<{ tasks: BakerTask[] }> => {
+    const response = await fetch(`${API_BASE_URL}/baker/${baker}?date=${date}`);
     const result = await handleResponse<{ tasks: any[] }>(response);
     
     return {
-      tasks: result.tasks.map(transformBakerTask)
+      tasks: result.tasks.map(task => ({
+        id: task.id,
+        time: new Date(task.time),
+        action: task.action,
+        details: task.details,
+        equipment: task.equipment,
+        status: task.status,
+        dependencies: task.dependencies?.map((dep: any) => ({
+          from: dep.from,
+          what: dep.what,
+          urgent: dep.urgent
+        }))
+      }))
     };
   },
 
   updateTaskStatus: async (
-    baker: 'Baker1' | 'Baker2',
+    baker: string,
     taskId: string,
     status: BakerTask['status']
   ): Promise<BakerTask> => {
@@ -206,10 +222,21 @@ getOrders: async (status?: string): Promise<Order[]> => {
     });
     
     const result = await handleResponse<any>(response);
-    return transformBakerTask(result);
+    return {
+      id: result.id,
+      time: new Date(result.time),
+      action: result.action,
+      details: result.details,
+      equipment: result.equipment,
+      status: result.status,
+      dependencies: result.dependencies?.map((dep: any) => ({
+        from: dep.from,
+        what: dep.what,
+        urgent: dep.urgent
+      }))
+    };
   },
 
-  // Debug method to fetch available recipes
   getAvailableRecipes: async (): Promise<Array<{
     product: string;
     minBatchSize: number;
