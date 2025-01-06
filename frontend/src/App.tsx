@@ -1,11 +1,12 @@
 // src/App.tsx
 import React, { useState } from 'react';
-import { ChefHat, Calendar, User, PlusCircle } from 'lucide-react';
+import { ChefHat, Calendar, User, PlusCircle, ClipboardList } from 'lucide-react';
 import OrderForm from './components/OrderForm';
 import GanttView from './components/GanttView';
 import BakerView from './components/BakerView';
+import OrdersView from './components/OrdersView';
 
-type ViewMode = 'new-order' | 'manager' | 'baker1' | 'baker2';
+type ViewMode = 'new-order' | 'manager' | 'baker1' | 'baker2' | 'orders';
 
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('manager');
@@ -40,6 +41,11 @@ const App: React.FC = () => {
             
             <div className="flex space-x-2 items-center">
               <NavButton
+                mode="orders"
+                icon={<ClipboardList className="w-4 h-4" />}
+                label="Orders"
+              />
+              <NavButton
                 mode="new-order"
                 icon={<PlusCircle className="w-4 h-4" />}
                 label="New Order"
@@ -70,6 +76,8 @@ const App: React.FC = () => {
           <OrderForm />
         ) : viewMode === 'manager' ? (
           <GanttView />
+        ) : viewMode === 'orders' ? (
+          <OrdersView />
         ) : (
           <BakerView selectedBaker={viewMode === 'baker1' ? 'Baker1' : 'Baker2'} />
         )}
@@ -81,7 +89,15 @@ const App: React.FC = () => {
           <div className="flex items-center space-x-2">
             <User className="w-4 h-4 text-gray-500" />
             <span className="text-sm text-gray-600">
-              Logged in as: {viewMode === 'manager' ? 'Manager' : viewMode === 'baker1' ? 'Baker 1' : 'Baker 2'}
+              Logged in as: {
+                viewMode === 'manager' 
+                  ? 'Manager' 
+                  : viewMode === 'baker1' 
+                    ? 'Baker 1' 
+                    : viewMode === 'baker2' 
+                      ? 'Baker 2' 
+                      : 'Staff'
+              }
             </span>
           </div>
           <div className="text-sm text-gray-600">
