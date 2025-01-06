@@ -228,15 +228,15 @@ export const bakeryApi = {
       schedule: any[];
       summary?: any;
     }>(response);
-
+    
     return {
       schedule: result.schedule.map(task => ({
-        orderId: task.order_id,
+        orderId: task.orderId ,
         step: task.step,
-        startTime: new Date(task.start_time),
-        endTime: new Date(task.end_time),
+        startTime: new Date(task.startTime),
+        endTime: new Date(task.endTime),
         resources: task.resources,
-        batchSize: task.batch_size,
+        batchSize: task.batchSize,
         status: task.status
       })),
       summary: result.summary ? {
