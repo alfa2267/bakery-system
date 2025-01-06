@@ -7,13 +7,16 @@ export interface OrderItem {
 }
 
 export interface Order {
-  id?: string;
+  id: string;
   customerName: string;
   deliveryDate: string;
   deliverySlot: string;
   location: string;
   items: OrderItem[];
   estimatedTravelTime: number;
+  status?: 'new' | 'pending' | 'in-progress' | 'completed' | 'cancelled';
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Production and Scheduling Types

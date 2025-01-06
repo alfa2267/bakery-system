@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import { bakeryApi } from '../api/bakeryApi';
 import { Order, OrderItem } from '../types';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import Alert from './ui/Alert';
 
 const OrderForm: React.FC = () => {
   const defaultItems: OrderItem[] = [
@@ -162,8 +162,7 @@ const OrderForm: React.FC = () => {
       {submitSuccess && (
         <Alert className="mb-4 bg-green-50 border-green-200">
           <CheckCircle className="w-5 h-5 text-green-600" />
-          <AlertTitle>Success</AlertTitle>
-          <AlertDescription>Order created successfully!</AlertDescription>
+          Success, Order created successfully!
         </Alert>
       )}
 
