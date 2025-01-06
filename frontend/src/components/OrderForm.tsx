@@ -224,15 +224,11 @@ const OrderForm: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-700">Order Items</h3>
           
           {/* Debug output */}
-          <div className="text-sm text-gray-500 mb-2">
-            Total Recipes: {recipesData.length}
-          </div>
-
+  
           <div className="grid grid-cols-1 gap-4">
             {recipesData.map((recipe) => {
               // Debug log for each recipe
-              console.log('Rendering recipe:', recipe);
-              
+
               const currentQuantity = formData.items?.find(
                 item => item.product.id === recipe.product.id
               )?.quantity || 0;
@@ -241,17 +237,16 @@ const OrderForm: React.FC = () => {
                 <div key={recipe.product.id} className="border p-4 rounded-lg">
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-lg font-medium text-gray-700 mb-1">
                         {recipe.product.name}
                       </label>
-                      <span className="text-xs text-gray-500">
-                        {recipe.product.id}
-                      </span>
+                    
                     </div>
                     <div className="w-1/3">
                       <input
                         type="number"
-                        value={recipe.minBatchSize}
+                        //value=""
+                        placeholder= {recipe.minBatchSize.toString()}
                         onChange={(e) => handleItemChange(recipe.product.id, parseInt(e.target.value, 10))}
                         min={recipe.minBatchSize || 0}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"

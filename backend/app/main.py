@@ -13,7 +13,7 @@ from typing import List, Optional, Dict
 from .models import (
     Order, ValidationResponse, ScheduleResponse,
     DailyScheduleSummary, ResourceUtilization, ScheduledTask,
-    Recipe, Product, ProductionStep, Ingredient  # Removed Step since it's not needed
+    Recipe, Product, ProductionStep, Ingredient
 )
 from .scheduler import BakeryScheduler
 from .config import settings
@@ -72,16 +72,28 @@ async def get_manifest():
 
 @app.post("/orders/validate")
 async def validate_order(order: Order) -> ValidationResponse:
-    """Validate an order before creation"""
+    """
+    Validate an order against constraints
+    Returns ValidationResponse with isValid and warnings
+    """
+    logger.info(f"Validating order: {order}")
+    
     try:
-        logger.info(f"Validating order: {order}")
+        # Use scheduler's validate_order method
         is_valid, warnings = scheduler.validate_order(order)
-        logger.info(f"Validation result: valid={is_valid}, warnings={warnings}")
-        return ValidationResponse(isValid=is_valid, warnings=warnings)
+        
+        return ValidationResponse(
+            isValid=is_valid,
+            warnings=warnings
+        )
+        
     except Exception as e:
         logger.error(f"Error during order validation: {str(e)}")
         logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Validation error: {str(e)}")
+        return ValidationResponse(
+            isValid=False,
+            warnings=[f"Validation error: {str(e)}"]
+        )
 
 @app.post("/orders")
 async def create_order(order: Order, db: Session = Depends(get_db)) -> ScheduleResponse:
@@ -129,6 +141,46 @@ async def create_order(order: Order, db: Session = Depends(get_db)) -> ScheduleR
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="An unexpected error occurred during order processing")
 
+@app.post("/orders/debug")
+async def debug_order(order_data: dict):
+    """Debug endpoint to check order data structure"""
+    try:
+        logger.debug(f"Received order data: {order_data}")
+        
+        # Try to create Order object
+        order = Order(**order_data)
+        
+        # Return detailed information about the parsed order
+        return {
+            "success": True,
+            "parsed_order": order.dict(exclude_none=True),
+            "field_values": {
+                "customer_name": order.customer_name,
+                "delivery_date": order.delivery_date,
+                "delivery_slot": order.delivery_slot,
+                "location": order.location,
+                "estimated_travel_time": order.estimated_travel_time,
+                "items": [{"product": item.product.dict(), "quantity": item.quantity} for item in order.items]
+            },
+            "validation": "Order data is valid"
+        }
+    except Exception as e:
+        logger.error(f"Order validation error: {str(e)}")
+        logger.error(traceback.format_exc())
+        return {
+            "success": False,
+            "error": str(e),
+            "received_data": order_data,
+            "expected_format": {
+                "customer_name": "string (or customerName)",
+                "delivery_date": "string (or deliveryDate)",
+                "delivery_slot": "string (or deliverySlot)",
+                "location": "string",
+                "estimated_travel_time": "integer (or estimatedTravelTime)",
+                "items": [{"product": {"id": "int", "name": "string"}, "quantity": "int"}]
+            }
+        }
+
 @app.get("/schedule/{date}")
 async def get_schedule(
     date: str, 
@@ -160,7 +212,7 @@ async def get_schedule(
                     resources=task.resources,
                     batchSize=task.batch_size,
                     status=task.status or 'pending',
-                    productName=task.product_name
+                    orderItemName=task.order_item.product.name if task.order_item else "Unknown"
                 )
                 for task in db_tasks
             ]
@@ -232,14 +284,10 @@ async def get_available_recipes():
     """Endpoint to list available recipes"""
     try:
         # Get recipes from scheduler
-        scheduler_recipes = scheduler.get_available_products()
-        logger.debug(f"Found {len(scheduler_recipes)} recipes")
+        available_products = scheduler.get_available_products()
+        logger.debug(f"Found {len(available_products)} recipes")
         
-        # Convert dictionary to list
-        recipes_list = list(scheduler_recipes)
-        logger.debug(f"Converted to list of {len(recipes_list)} recipes")
-        
-        return {"recipes": recipes_list}
+        return {"recipes": available_products}
         
     except Exception as e:
         logger.error(f"Error fetching recipes: {str(e)}")

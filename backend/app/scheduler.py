@@ -1,9 +1,12 @@
 import json
 import logging
+import traceback
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict
 from pathlib import Path
 from .models import Order, Recipe, ProductionStep, ScheduledTask
+import uuid
+
 
 # Set up logging configuration
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -16,8 +19,6 @@ class BakeryScheduler:
         self.orders = []
         self.schedule = []
 
-
-
     def _load_recipes(self) -> Dict[int, Recipe]:
         """Load recipes from JSON file"""
         try:
@@ -25,11 +26,11 @@ class BakeryScheduler:
             with open(self.recipes_path, 'r') as f:
                 recipes_data = json.load(f)
                 
-            # Convert list to dictionary with recipe ID as key
+            # Convert list to dictionary with product ID as key
             recipes = {}
             for recipe_data in recipes_data:
                 recipe = Recipe(**recipe_data)
-                recipes[recipe.id] = recipe
+                recipes[recipe.product.id] = recipe
                 
             logger.info("Recipes loaded successfully")
             return recipes
@@ -37,56 +38,61 @@ class BakeryScheduler:
             logger.error(f"Error loading recipes: {str(e)}")
             raise
 
-
-
-    def validate_order(self, order: Order) -> Tuple[bool, List[str]]:
+    def validate_order(self, order: Order) -> tuple[bool, list[str]]:
+        """
+        Validate an order against constraints
+        Returns (is_valid, warnings)
+        """
+        logger.info(f"Validating order: {order}")
         warnings = []
-        is_valid = True
-
-        if not order.items:
-            logger.warning(f"Order {order.id} has no items")
-            is_valid = False
-            warnings.append("Order has no items")
-
+        
         try:
-            delivery_date = datetime.strptime(order.delivery_date, "%Y-%m-%d").date()
-            if delivery_date < datetime.now().date():
-                logger.warning(f"Order {order.id} has an invalid delivery date: {order.delivery_date}")
-                is_valid = False
-                warnings.append("Delivery date must be in the future")
-        except ValueError:
-            logger.error(f"Invalid delivery date format for order {order.id}: {order.delivery_date}")
-            is_valid = False
-            warnings.append("Invalid delivery date format")
-
-        for item in order.items:
-            recipe = self.recipes.get(item.product)
-            if not recipe:
-                logger.error(f"Unknown product {item.product} in order {order.id}")
-                is_valid = False
-                warnings.append(f"Unknown product: {item.product}. Available products: {', '.join(self.recipes.keys())}")
-                continue
-
-            if item.quantity < recipe.minBatchSize:
-                logger.warning(f"Order {order.id}: Item {item.product} has a quantity lower than minimum batch size")
-                warnings.append(
-                    f"Minimum batch size for {item.product} is {recipe.minBatchSize}. Order will be rounded up."
-                )
-
-            batches = (item.quantity + recipe.maxBatchSize - 1) // recipe.maxBatchSize
-            if batches > 1:
-                logger.info(f"Order {order.id}: Item {item.product} requires {batches} batches")
-                warnings.append(f"Order requires {batches} batches of {item.product}")
-
-        return is_valid, warnings
-
-
+            # Validate each item in the order
+            for item in order.items:
+                # Find the recipe for this product
+                recipe = self.recipes.get(item.product.id)
+                
+                if not recipe:
+                    warnings.append(f"No recipe found for product {item.product.name}")
+                    continue
+                
+                # Check batch size constraints
+                if item.quantity < recipe.minBatchSize:
+                    warnings.append(
+                        f"Order quantity {item.quantity} for {item.product.name} "
+                        f"is below minimum batch size of {recipe.minBatchSize}"
+                    )
+                
+                if item.quantity > recipe.maxBatchSize:
+                    warnings.append(
+                        f"Order quantity {item.quantity} for {item.product.name} "
+                        f"exceeds maximum batch size of {recipe.maxBatchSize}"
+                    )
+            
+            # Format delivery date
+            try:
+                delivery_date = datetime.strptime(order.delivery_date, "%Y-%m-%d")
+                if delivery_date.date() < datetime.now().date():
+                    warnings.append("Delivery date cannot be in the past")
+            except ValueError:
+                warnings.append("Invalid delivery date format")
+            
+            logger.info(f"Validation complete. Warnings: {warnings}")
+            return len(warnings) == 0, warnings
+            
+        except Exception as e:
+            logger.error(f"Error during order validation: {str(e)}")
+            logger.error(traceback.format_exc())
+            warnings.append(f"Validation error: {str(e)}")
+            return False, warnings
 
     def get_available_products(self) -> List[Dict]:
         """Return list of available products and their constraints"""
-        try:
-            available_products = [
-                {
+        available_products = []
+        
+        for recipe in self.recipes.values():
+            try:
+                product_info = {
                     "product": {
                         "id": recipe.product.id,
                         "name": recipe.product.name
@@ -96,20 +102,17 @@ class BakeryScheduler:
                     "requiresChilling": recipe.requiresChilling,
                     "totalProductionTime": sum(step.duration for step in recipe.steps)
                 }
-                for recipe in self.recipes.values()
-            ]
-            
-            # Log product names properly by accessing the nested name field
-            product_names = [prod['product']['name'] for prod in available_products]
-            logger.info(f"Available products: {', '.join(product_names)}")
-            
-            return available_products
-            
-        except Exception as e:
-            logger.error(f"Error getting available products: {str(e)}")
-            logger.error(traceback.format_exc())
-            raise
-
+                available_products.append(product_info)
+            except Exception as e:
+                logger.error(f"Error processing recipe {recipe}: {str(e)}")
+                continue
+        
+        # Log available products by name
+        product_names = [f"{prod['product']['name']} (ID: {prod['product']['id']})" 
+                        for prod in available_products]
+        logger.info(f"Available products: {', '.join(product_names)}")
+        
+        return available_products
 
 
 
@@ -118,10 +121,17 @@ class BakeryScheduler:
         current_time = datetime.now()  # Start scheduling from now
 
         for item in order.items:
-            batches = self._calculate_batches(item.quantity, self.recipes[item.product])
+            # Find the matching recipe
+            matching_recipe = self.recipes.get(item.product.id)
+            
+            if not matching_recipe:
+                logger.error(f"No recipe found for product {item.product.name}")
+                continue
+
+            batches = self._calculate_batches(item.quantity, matching_recipe)
 
             for batch_size in batches:
-                for step in self.get_recipe_steps(item.product):  # Iterate through each product's steps
+                for step in matching_recipe.steps:
                     # Get the required resources dynamically
                     resources = self._get_required_resources(step)
 
@@ -129,17 +139,20 @@ class BakeryScheduler:
                     end_time = current_time + timedelta(minutes=step.duration)
                     start_time = current_time
 
+                    # Generate a unique ID for the order item if not present
+                    order_item_id = str(uuid.uuid4()) if not hasattr(item, 'id') or item.id is None else str(item.id)
+
                     task = ScheduledTask(
                         orderId=order.id,
-                        orderItemId=item.id,  # Add the item ID here
-                        orderItemName=item.product,  # Add the item name here
+                        orderItemId=order_item_id,
+                        orderItemName=item.product.name,
                         step=step.name,
                         startTime=start_time,
                         endTime=end_time,
-                        resources=resources,  # Assign the resources
-                        batchSize=batch_size,  # Use calculated batch size
+                        resources=resources,
+                        batchSize=batch_size,
                         status="pending",
-                        product=item.product  # Use the product from the item
+                        product=item.product
                     )
                     tasks.append(task)
 
@@ -147,6 +160,9 @@ class BakeryScheduler:
                     current_time = end_time
 
         return tasks
+
+
+
 
     def _calculate_batches(self, quantity: int, recipe: Recipe) -> List[int]:
         """Calculate optimal batch sizes"""

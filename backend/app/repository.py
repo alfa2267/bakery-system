@@ -5,12 +5,42 @@ from datetime import datetime
 from . import models
 import logging
 from fastapi import HTTPException
+from sqlalchemy.orm import joinedload
 
 logger = logging.getLogger(__name__)
 
 class OrderRepository:
     def __init__(self, db: Session):
         self.db = db
+
+    def _get_or_create_product(self, product: models.Product) -> models.ProductDB:
+        """
+        Find an existing product or create a new one
+        """
+        try:
+            # Try to find existing product
+            existing_product = self.db.query(models.ProductDB)\
+                .filter(
+                    (models.ProductDB.id == product.id) | 
+                    (models.ProductDB.name == product.name)
+                )\
+                .first()
+
+            if existing_product:
+                return existing_product
+
+            # Create new product if not exists
+            new_product = models.ProductDB(
+                id=product.id,
+                name=product.name
+            )
+            self.db.add(new_product)
+            self.db.flush()  # This will generate an ID if not provided
+            return new_product
+
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting/creating product: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error processing product")
 
     def create_order(self, order: models.Order, tasks: List[models.ScheduledTask]) -> models.OrderDB:
         try:
@@ -24,19 +54,23 @@ class OrderRepository:
                 delivery_slot=order.delivery_slot,
                 location=order.location,
                 estimated_travel_time=order.estimated_travel_time,
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
+                status=order.status or 'new'
             )
 
-            # Create order items
-            db_items = [
-                models.OrderItemDB(
+            # Create order items with associated products
+            db_items = []
+            for item in order.items:
+                # Get or create the product
+                db_product = self._get_or_create_product(item.product)
+                
+                # Create order item
+                db_item = models.OrderItemDB(
                     order_id=order.id,
-                    product=item.product,  # This should refer to each item in the order.items list
+                    product_id=db_product.id,
                     quantity=item.quantity
                 )
-                for item in order.items  # Ensure you're iterating over items in the order
-            ]
-
+                db_items.append(db_item)
 
             # Add order and items to the session
             logger.info("Adding order and items to the session")
@@ -55,7 +89,7 @@ class OrderRepository:
             db_tasks = [
                 models.ScheduledTaskDB(
                     order_id=order.id,
-                    order_item_id=item.id,  # Ensure this is set from the db_item
+                    order_item_id=item.id,
                     step=task.step,
                     start_time=task.startTime,
                     end_time=task.endTime,
@@ -88,6 +122,11 @@ class OrderRepository:
         """Fetch a specific order by its ID"""
         logger.info("Fetching order with ID: %s", order_id)
         order = self.db.query(models.OrderDB)\
+            .options(
+                # Eager load related items and their products
+                joinedload(models.OrderDB.items)\
+                .joinedload(models.OrderItemDB.product)
+            )\
             .filter(models.OrderDB.id == order_id)\
             .first()
 
@@ -99,18 +138,26 @@ class OrderRepository:
     def get_orders(self) -> List[models.OrderDB]:
         """Fetch all orders with their items"""
         logger.info("Fetching all orders with their items")
-        orders = self.db.query(models.OrderDB).all()
+        orders = self.db.query(models.OrderDB)\
+            .options(
+                joinedload(models.OrderDB.items)\
+                .joinedload(models.OrderItemDB.product)
+            )\
+            .all()
 
         if not orders:
             logger.warning("No orders found")
         
-        # Directly return OrderDB objects
         return orders
 
     def get_orders_by_date(self, date: str) -> List[models.OrderDB]:
         """Fetch all orders for a specific delivery date"""
         logger.info("Fetching orders for date: %s", date)
         orders = self.db.query(models.OrderDB)\
+            .options(
+                joinedload(models.OrderDB.items)\
+                .joinedload(models.OrderItemDB.product)
+            )\
             .filter(models.OrderDB.delivery_date == date)\
             .all()
 
@@ -124,6 +171,10 @@ class OrderRepository:
         logger.info("Fetching tasks for date: %s", date)
         tasks = self.db.query(models.ScheduledTaskDB)\
             .join(models.OrderDB)\
+            .options(
+                joinedload(models.ScheduledTaskDB.order_item)\
+                .joinedload(models.OrderItemDB.product)
+            )\
             .filter(models.OrderDB.delivery_date == date)\
             .all()
 
@@ -141,6 +192,10 @@ class OrderRepository:
         logger.info("Fetching tasks for date: %s requiring resource: %s", date, resource)
         tasks = self.db.query(models.ScheduledTaskDB)\
             .join(models.OrderDB)\
+            .options(
+                joinedload(models.ScheduledTaskDB.order_item)\
+                .joinedload(models.OrderItemDB.product)
+            )\
             .filter(
                 models.OrderDB.delivery_date == date,
                 models.ScheduledTaskDB.resources.contains([resource])
