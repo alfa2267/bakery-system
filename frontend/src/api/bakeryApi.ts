@@ -2,7 +2,7 @@ import {
   Order, 
   ValidationResponse, 
   ScheduledTask,
-  BakerTask,
+  StepTask,
   //transformScheduledTask,
   Recipe
 } from '../types';
@@ -221,18 +221,54 @@ export const bakeryApi = {
     }
   },
 
+  getTasks: async (date: string, resource: string): Promise<{ tasks: StepTask[] }> => {
+    try {
+      const url = new URL(`${API_BASE_URL}/resources`);
+      url.searchParams.append('date', date);
+      url.searchParams.append('baker_name', staff);
+
+      const response = await fetch(url.toString());
+      const result = await handleResponse<{
+        staff: any[];
+        equipment: any[];
+        steptasks?: any[];
+      }>(response);
+
+      console.log('Baker tasks response:', result);
+
+      // Transform baker tasks
+      const tasks = (result.steptasks || []).map(task => ({
+        id: task.id,
+        time: new Date(task.time),
+        action: task.action,
+        details: task.details,
+        equipment: task.equipment,
+        status: task.status,
+        dependencies: task.dependencies?.map((dep: any) => ({
+          from: dep.from,
+          what: dep.what,
+          urgent: dep.urgent
+        })) || []
+      }));
+
+      return { tasks };
+    } catch (error) {
+      console.error('Error fetching baker tasks:', error);
+      throw error;
+    }
+  },
 
 
   updateTaskStatus: async (
     taskId: string,
-    status: BakerTask['status']
-  ): Promise<BakerTask> => {
+    status: StepTask['status']
+  ): Promise<StepTask> => {
     const response = await fetch(`${API_BASE_URL}/resources/tasks/${taskId}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
-    const result = await handleResponse<BakerTask>(response);
+    const result = await handleResponse<StepTask>(response);
     return result;
   },
 

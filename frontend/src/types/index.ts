@@ -77,7 +77,7 @@ export interface ScheduledTask {
 
 export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'blocked';
 
-export interface BakerTask {
+export interface StepTask {
   id: string;
   time: Date;
   action: string;
@@ -144,7 +144,7 @@ export const DEFAULT_OPTIONS: GanttOptions = {
   }
 };
 
-export const PRODUCTION_STEPS: ProductionStep[] = ['mixing', 'chilling', 'shaping', 'baking', 'cooling'];
+export const PRODUCTION_STEPS: ProductionStep[] = ['mixing', 'chilling', 'shaping', 'baking', 'cooling', 'proofing'];
 
 export const STEP_COLORS: Record<ProductionStep, string> = {
   mixing: 'bg-blue-500',

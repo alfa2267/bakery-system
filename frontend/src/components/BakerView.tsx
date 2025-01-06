@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, ChefHat, ArrowRight } from 'lucide-react';
 import { bakeryApi } from '../api/bakeryApi';
-import { BakerTask, formatDateToISO } from '../types';
+import { StepTask, formatDateToISO } from '../types';
 
 interface BakerViewProps {
   selectedBaker: 'Baker1' | 'Baker2';
@@ -9,23 +9,23 @@ interface BakerViewProps {
 
 const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
   const [selectedDate, setSelectedDate] = useState(formatDateToISO(new Date()).split('T')[0]);
-  const [bakerTasks, setBakerTasks] = useState<BakerTask[]>([]);
+  const [stepTasks, setTasks] = useState<StepTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchBakerTasks = async () => {
+    const fetchStepTasks = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
         const response = await bakeryApi.getResources(selectedDate, selectedBaker);
         
-        console.log(response?)
+        console.log(response)
         // Ensure tasks is an array, default to empty array if undefined
         const tasksData = response?.task_resources. || [];
         
-        setBakerTasks(tasksData);
+        setTasks(tasksData);
       } catch (err) {
         console.error('Error fetching baker tasks:', err);
         
@@ -34,41 +34,41 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
           : 'Failed to load baker tasks due to an unknown error';
         
         setError(errorMessage);
-        setBakerTasks([]);
+        setTasks([]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchBakerTasks();
+    fetchStepTasks();
   }, [selectedDate, selectedBaker]);
 
-  const handleStatusChange = async (taskId: string, newStatus: BakerTask['status']) => {
+  const handleStatusChange = async (taskId: string, newStatus: StepTask['status']) => {
     try {
       // Optimistic update
-      const updatedTasks = bakerTasks.map(task => 
+      const updatedTasks = stepTasks.map(task => 
         task.id === taskId ? { ...task, status: newStatus } : task
       );
       
-      setBakerTasks(updatedTasks);
+      setTasks(updatedTasks);
 
       // API call to update status
-      await bakeryApi.updateTaskStatus(selectedBaker, taskId, newStatus);
+      await bakeryApi.updateTaskStatus(taskId, newStatus);
     } catch (err) {
       console.error('Error updating task status:', err);
       
       // Revert optimistic update if API call fails
       try {
-        const response = await bakeryApi.getBakerTasks(selectedDate, selectedBaker);
-        setBakerTasks(response?.tasks || []);
+        const response = await bakeryApi.getTasks(selectedDate, selectedBaker);
+        setTasks(response?.tasks || []);
       } catch (fetchErr) {
         console.error('Error refetching tasks:', fetchErr);
-        setBakerTasks([]);
+        setTasks([]);
       }
     }
   };
 
-  const getStatusColor = (status: BakerTask['status']) => {
+  const getStatusColor = (status: StepTask['status']) => {
     switch(status) {
       case 'completed': return 'bg-green-100 border-green-500';
       case 'in-progress': return 'bg-blue-100 border-blue-500';
@@ -112,13 +112,13 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
       </div>
       
       {/* Tasks List */}
-      {bakerTasks.length === 0 ? (
+      {stepTasks.length === 0 ? (
         <div className="text-center text-gray-500 py-4">
           No tasks scheduled for {selectedBaker} on {selectedDate}
         </div>
       ) : (
         <div className="space-y-4">
-          {bakerTasks.map((task) => (
+          {stepTasks.map((task) => (
             <div 
               key={task.id} 
               className={`border rounded-lg p-4 ${getStatusColor(task.status)} relative`}
@@ -164,7 +164,7 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
               <div className="mt-2">
                 <select 
                   value={task.status}
-                  onChange={(e) => handleStatusChange(task.id, e.target.value as BakerTask['status'])}
+                  onChange={(e) => handleStatusChange(task.id, e.target.value as stepTask['status'])}
                   className="w-full p-1 border rounded text-sm"
                 >
                   <option value="pending">Pending</option>
