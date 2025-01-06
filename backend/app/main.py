@@ -25,6 +25,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -46,7 +47,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
-origins = ["*"]
+origins = [
+        "*",  # Be careful in production
+        "https://localhost:3000",
+        "https://*.app.github.dev"
+        ]
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,6 +63,11 @@ app.add_middleware(
 
 # Initialize scheduler
 scheduler = BakeryScheduler()
+
+
+@app.get("/manifest.json")
+async def get_manifest():
+    return FileResponse("./frontend/public/manifest.json")
 
 @app.post("/orders/validate")
 async def validate_order(order: Order) -> ValidationResponse:
@@ -127,6 +137,35 @@ async def create_order(order: Order, db: Session = Depends(get_db)) -> ScheduleR
         logger.error(f"Unexpected error in order creation: {str(unexpected_error)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="An unexpected error occurred during order processing")
+
+@app.get("/orders")
+async def list_orders(
+    db: Session = Depends(get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000)
+):
+    """
+    Retrieve a list of orders with optional pagination
+    """
+    try:
+        logger.info(f"Fetching orders")
+        repository = OrderRepository(db)
+        
+        # Fetch orders from the database
+        orders = repository.get_orders()
+        
+        return {
+            "orders": orders,
+            "total": len(orders)
+        }
+    except SQLAlchemyError as db_error:
+        logger.error(f"Database error fetching orders: {str(db_error)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
+    except Exception as unexpected_error:
+        logger.error(f"Unexpected error fetching orders: {str(unexpected_error)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching orders")
 
 @app.get("/schedule/{date}")
 async def get_schedule(
