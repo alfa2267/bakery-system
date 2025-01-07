@@ -23,7 +23,7 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
         
         console.log(response)
         // Ensure tasks is an array, default to empty array if undefined
-        const tasksData = response?.task_resources. || [];
+        const tasksData = response?.task_resources || [];
         
         setTasks(tasksData);
       } catch (err) {
@@ -164,7 +164,7 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
               <div className="mt-2">
                 <select 
                   value={task.status}
-                  onChange={(e) => handleStatusChange(task.id, e.target.value as stepTask['status'])}
+                  onChange={(e) => handleStatusChange(task.id, e.target.value as StepTask['status'])}
                   className="w-full p-1 border rounded text-sm"
                 >
                   <option value="pending">Pending</option>

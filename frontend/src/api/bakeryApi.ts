@@ -225,7 +225,7 @@ export const bakeryApi = {
     try {
       const url = new URL(`${API_BASE_URL}/resources`);
       url.searchParams.append('date', date);
-      url.searchParams.append('baker_name', staff);
+      url.searchParams.append('baker_name', resource);
 
       const response = await fetch(url.toString());
       const result = await handleResponse<{
