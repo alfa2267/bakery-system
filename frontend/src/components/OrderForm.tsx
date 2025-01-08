@@ -30,7 +30,7 @@ const OrderForm: React.FC = () => {
       formData.location &&
       formData.items?.some(item => item.quantity > 0)
     );
-    
+
     setWarnings(prev => isFormValid ? [] : prev);
     setIsValid(isFormValid);
   }, [formData]);
@@ -136,7 +136,8 @@ const OrderForm: React.FC = () => {
       }
     } catch (error) {
       console.error('Error submitting order:', error);
-      setWarnings(['Failed to submit order. Please try again.']);
+      setWarnings(['Failed to submit order. Please try again.', 'hii']);
+    
     } finally {
       setIsSubmitting(false);
     }
@@ -152,8 +153,8 @@ const OrderForm: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">Place New Order</h2>
-
+    
+    
       {submitSuccess && (
         <Alert variant="success" title="Success" className="mb-4">
           Order created successfully!
@@ -161,12 +162,44 @@ const OrderForm: React.FC = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
+
+
+                  <div className="flex"> 
+
+            <div className="col-md-6">
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">Place New Order</h2>
+            </div>
+
+
+              {/* Submit Button */}
+            <div className="col-md-6">
+
+              <button
+              type="submit"
+              disabled={!isValid || isSubmitting}
+              className={`w-full py-2 px-4 rounded-md font-semibold transition-colors duration-200 ${
+                isValid && !isSubmitting
+                  ? 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {isSubmitting ? 'Creating Order...' : 'Place Order'}
+            </button>
+            </div>
+
+            </div>
+
+
+
+
+
+
         {/* Customer Info */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Customer Name</label>
           <input
             type="text"
-            value={formData.customerName}
+            value="Pablo"//{formData.customerName}
             onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
@@ -209,7 +242,7 @@ const OrderForm: React.FC = () => {
           <label className="block text-sm font-medium text-gray-700 mb-2">Delivery Location</label>
           <input
             type="text"
-            value={formData.location}
+            value= "Lagos" //{formData.location}
             onChange={(e) => setFormData({ ...formData, location: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="Enter delivery address"
@@ -245,7 +278,7 @@ const OrderForm: React.FC = () => {
                     <div className="w-1/3">
                       <input
                         type="number"
-                        //value=""
+                        value={recipe.minBatchSize}
                         placeholder= {recipe.minBatchSize.toString()}
                         onChange={(e) => handleItemChange(recipe.product.id, parseInt(e.target.value, 10))}
                         min={recipe.minBatchSize || 0}
@@ -277,18 +310,7 @@ const OrderForm: React.FC = () => {
           </div>
         )}
 
-        {/* Submit Button */}
-        <button
-          type="submit"
-          disabled={!isValid || isSubmitting}
-          className={`w-full py-2 px-4 rounded-md font-semibold transition-colors duration-200 ${
-            isValid && !isSubmitting
-              ? 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          {isSubmitting ? 'Creating Order...' : 'Place Order'}
-        </button>
+     
       </form>
     </div>
   );

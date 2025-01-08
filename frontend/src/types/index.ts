@@ -72,7 +72,7 @@ export interface ScheduledTask {
   name?: string;
   dependencies?: string[];
   progress?: number;
-  productName?: string;
+  product?: Product;
 }
 
 export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'blocked';

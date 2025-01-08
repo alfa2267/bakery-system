@@ -151,25 +151,9 @@ export const bakeryApi = {
         throw new Error('Invalid orders format: expected an array of orders');
       }
 
-      // Transform the orders
-      return result.orders.map((order: any) => ({
-        id: order.id || '',
-        customerName: order.customer_name || '',
-        status: order.status || 'new',
-        created_at: order.created_at || null,
-        updated_at: order.updated_at || null,
-        deliveryDate: order.delivery_date || '',
-        deliverySlot: order.delivery_slot || '',
-        location: order.location || '',
-        estimatedTravelTime: order.estimated_travel_time || 0,
-        items: (order.items || []).map((item: any) => ({
-          product: {
-            name: item.product?.name || '', 
-            id: item.product?.id || 0
-          },
-          quantity: item.quantity || 0
-        }))
-      }));
+      return result.orders;
+
+
     } catch (error) {
       console.error('Error fetching orders:', error);
       throw error;

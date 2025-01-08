@@ -160,7 +160,10 @@ class BakeryScheduler:
                     "equipment": task.resources,
                     "status": task.status or 'pending',
                     "dependencies": [],
-                    "productName": task.order_item.product.name if task.order_item and task.order_item.product else "Unknown"
+                    "product": {
+                        "id": task.order_item.product.id,
+                        "name": task.order_item.product.name
+                     } if task.order_item and task.order_item.product else None 
                 }
                 tasks.append(task_details)
 
@@ -280,15 +283,13 @@ class BakeryScheduler:
 
                     task = ScheduledTask(
                         orderId=order.id,
-                        orderItemId=order_item_id,
-                        orderItemName=item.product.name,
+                        product=item.product,
                         step=step.name,
                         startTime=start_time,
                         endTime=end_time,
                         resources=resources,
                         batchSize=batch_size,
-                        status="pending",
-                        product=item.product
+                        status="pending"
                     )
                     tasks.append(task)
 

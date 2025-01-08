@@ -229,7 +229,11 @@ async def get_schedule(
                     resources=task.resources,
                     batchSize=task.batch_size,
                     status=task.status or 'pending',
-                    orderItemName=task.order_item.product.name if task.order_item else "Unknown"
+                    product=Product(
+                    id=task.order_item.product.id,
+                    name=task.order_item.product.name
+                ) if task.order_item and task.order_item.product else None
+            
                 )
                 for task in db_tasks
             ]

@@ -18,19 +18,20 @@ const GanttView: React.FC = () => {
         const response = await bakeryApi.getSchedule(selectedDate);
         if (response && response.schedule) {
 
+
+  console.log(response.schedule)
+
           const validatedSchedule = response.schedule.map((task, index) => ({
-            orderId: task.orderId || `unknown-${index}`,
-            step: task.step || '',
-            startTime: task.startTime instanceof Date 
+            ...task,
+             startTime: task.startTime instanceof Date 
               ? task.startTime 
               : new Date(task.startTime || Date.now()),
             endTime: task.endTime instanceof Date 
               ? task.endTime 
-              : new Date(task.endTime || Date.now()),
-            resources: Array.isArray(task.resources) ? task.resources : [],
-            batchSize: task.batchSize || 0,
-            status: task.status || 'pending'
+              : new Date(task.endTime || Date.now())
           }));
+
+          
           setSchedule(validatedSchedule);
         } else {
           setSchedule([]);
@@ -117,6 +118,7 @@ const GanttView: React.FC = () => {
     );
   }
 
+
   return (
     <div className="p-4">
       <div className="mb-6 flex items-center justify-between">
@@ -176,10 +178,8 @@ const GanttView: React.FC = () => {
                         key={taskIndex}
                         className={`absolute h-10 top-3 ${STEP_COLORS[task.step as keyof typeof STEP_COLORS]} 
                           ${STEP_HOVER_COLORS[task.step as keyof typeof STEP_HOVER_COLORS]} rounded-md`}
-                        style={{ left: `${barLeft}%`, width: `${barWidth}%` }}
-                      >
-                        <div className="px-2 text-white truncate">{`Order ${task.orderId.slice(0, 8)}`}</div>
-                        <div className="px-2 text-white truncate">{`Order ${task.productName}`}</div>
+                        style={{ left: `${barLeft}%`, width: `${barWidth}%` }} >
+                        <div className="px-2 text-sm text-white truncate">{`${task.product?.name}`}</div>
 
                       </div>
                       

@@ -191,6 +191,8 @@ const OrderView: React.FC = () => {
     return <div className="text-red-500 p-4">{error}</div>;
   }
 
+  console.log(filteredOrders)
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -242,7 +244,7 @@ const OrderView: React.FC = () => {
                     <div className="space-y-1">
                       {order.items.map((item) => (
                         <div key={item.product.id} className="text-sm">
-                          {item.product.id}: {item.quantity}
+                          {item.product.name}: {item.quantity}
                         </div>
                       ))}
                     </div>

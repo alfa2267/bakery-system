@@ -20,6 +20,11 @@ class ProductDB(Base):
     order_items = relationship("OrderItemDB", back_populates="product")
     recipes = relationship("RecipeDB", back_populates="product")
 
+    class Config:
+        from_attributes = True
+
+        
+
 class OrderItemDB(Base):
     __tablename__ = "order_items"
     
@@ -179,9 +184,7 @@ class ScheduledTask(BaseModel):
     resources: List[str]
     batchSize: int = Field(gt=0)  # Must be positive
     status: Optional[str] = 'pending'
-    orderItemId: Optional[str] = None  # Make this optional
-    orderItemName: str
-    product: Optional[Product] = None  # Make product optional if not always needed
+    product: Optional[Product] = None  # Fixed: proper type annotation
 
     class Config:
         from_attributes = True
