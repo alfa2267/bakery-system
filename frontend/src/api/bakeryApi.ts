@@ -2,9 +2,10 @@ import {
   Order, 
   ValidationResponse, 
   ScheduledTask,
-  StepTask,
-  //transformScheduledTask,
-  Recipe
+  Resource,
+  Recipe,
+  BaseTask,
+  TaskStatus
 } from '../types';
 
 const API_BASE_URL = (() => {
@@ -56,7 +57,6 @@ async function handleResponse<T>(response: Response): Promise<T> {
   }
   try {
     const data = await response.json();
-    //('API Response:', data); // Debug log
     return data;
   } catch (error) {
     console.error('Error parsing response:', error);
@@ -132,32 +132,13 @@ export const bakeryApi = {
   },
 
   getOrders: async (): Promise<Order[]> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/orders`, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-      });
+    const response = await fetch(`${API_BASE_URL}/orders`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+    });
 
-      // Log raw response for debugging
-      const rawResponse = await response.text();
-      console.log('Raw orders response:', rawResponse);
-
-      // Parse the response manually
-      const result = JSON.parse(rawResponse);
-     // console.log('Parsed orders result:', result);
-
-      // Validate the response structure
-      if (!result.orders || !Array.isArray(result.orders)) {
-        throw new Error('Invalid orders format: expected an array of orders');
-      }
-
-      return result.orders;
-
-
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-      throw error;
-    }
+    const result = await handleResponse<{ orders: Order[] }>(response);
+    return result.orders;
   },
 
   getSchedule: async (date: string, includeDetails: boolean = false): Promise<ScheduleResponse> => {
@@ -167,12 +148,31 @@ export const bakeryApi = {
     return handleResponse<ScheduleResponse>(response);
   },
 
+  updateTaskTiming: async (taskId: string, start: Date, end: Date): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/timing`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start: start.toISOString(),
+        end: end.toISOString()
+      }),
+    });
+    await handleResponse<void>(response);
+  },
+
+  updateTaskStatus: async (taskId: string, status: TaskStatus): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    await handleResponse<void>(response);
+  },
+
   getConfig: async (): Promise<ConfigResponse> => {
     const response = await fetch(`${API_BASE_URL}/config`);
     return handleResponse<ConfigResponse>(response);
   },
-
- 
 
   getResources: async (
     date?: string, 
@@ -181,107 +181,49 @@ export const bakeryApi = {
   ): Promise<{
     staff: any[];
     equipment: any[];
-    task_resources?: any[];
+    task_resources?: ScheduledTask[];
+
   }> => {
     const url = new URL(`${API_BASE_URL}/resources`);
     if (date) url.searchParams.append('date', date);
     if (filterName) url.searchParams.append('filter_name', filterName);
     if (filterType) url.searchParams.append('filter_type', filterType);
   
-    try {
-      const response = await fetch(url.toString());
-      const result = await handleResponse<{
-        staff: any[];
-        equipment: any[];
-        task_resources?: any[];
-      }>(response);
-  
-     // console.log('Resources response:', result);
-  
-      return result;
-    } catch (error) {
-      console.error('Error fetching resources:', error);
-      throw error;
-    }
+    const response = await fetch(url.toString());
+    return handleResponse<{
+      staff: any[];
+      equipment: any[];
+      task_resources?: ScheduledTask[];
+    }>(response);
   },
 
-  getTasks: async (date: string, resource: string): Promise<{ tasks: StepTask[] }> => {
-    try {
-      const url = new URL(`${API_BASE_URL}/resources`);
-      url.searchParams.append('date', date);
-      url.searchParams.append('baker_name', resource);
+  getTasks: async (date: string, resource: string): Promise<{ tasks: BaseTask[] }> => {
+    const url = new URL(`${API_BASE_URL}/resources`);
+    url.searchParams.append('date', date);
+    url.searchParams.append('baker_name', resource);
 
-      const response = await fetch(url.toString());
-      const result = await handleResponse<{
-        staff: any[];
-        equipment: any[];
-        steptasks?: any[];
-      }>(response);
+    const response = await fetch(url.toString());
+    const result = await handleResponse<{
+      staff: any[];
+      equipment: any[];
+      tasks?: BaseTask[];
+    }>(response);
 
-      console.log('Baker tasks response:', result);
-
-      // Transform baker tasks
-      const tasks = (result.steptasks || []).map(task => ({
-        id: task.id,
-        time: new Date(task.time),
-        action: task.action,
-        details: task.details,
-        equipment: task.equipment,
-        status: task.status,
-        dependencies: task.dependencies?.map((dep: any) => ({
-          from: dep.from,
-          what: dep.what,
-          urgent: dep.urgent
-        })) || []
-      }));
-
-      return { tasks };
-    } catch (error) {
-      console.error('Error fetching baker tasks:', error);
-      throw error;
-    }
+    return { tasks: result.tasks || [] };
   },
-
-
-  updateTaskStatus: async (
-    taskId: string,
-    status: StepTask['status']
-  ): Promise<StepTask> => {
-    const response = await fetch(`${API_BASE_URL}/resources/tasks/${taskId}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    const result = await handleResponse<StepTask>(response);
-    return result;
-  },
-
-  
 
   getAvailableRecipes: async (): Promise<Recipe[]> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/recipes`);
-      const data = await handleResponse<RecipesResponse>(response);
-      
-     // console.log(data.recipes)
-
-      // Check if we have recipes array and return it
-      if (data && Array.isArray(data.recipes)) {
-      //  console.log('Recipes fetched:', data.recipes);
-        return data.recipes;
-      }
-      
-      // If data is an array directly (fallback)
-      if (Array.isArray(data)) {
-     //   console.log('Recipes fetched (direct array):', data);
-        return data;
-      }
-      
-      console.error('Invalid recipes data structure:', data);
-      throw new Error('Invalid recipes data structure');
-    } catch (error) {
-      console.error('Error fetching recipes:', error);
-      throw error;
+    const response = await fetch(`${API_BASE_URL}/recipes`);
+    const data = await handleResponse<RecipesResponse>(response);
+    
+    if (data && Array.isArray(data.recipes)) {
+      return data.recipes;
     }
+    
+    if (Array.isArray(data)) {
+      return data;
+    }
+    
+    throw new Error('Invalid recipes data structure');
   }
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, ChefHat, ArrowRight } from 'lucide-react';
 import { bakeryApi } from '../api/bakeryApi';
-import { StepTask, formatDateToISO } from '../types';
+import { ScheduledTask, TaskStatus, formatDateToISO } from '../types';
 
 interface BakerViewProps {
   selectedBaker: 'Baker1' | 'Baker2';
@@ -9,22 +9,20 @@ interface BakerViewProps {
 
 const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
   const [selectedDate, setSelectedDate] = useState(formatDateToISO(new Date()).split('T')[0]);
-  const [stepTasks, setTasks] = useState<StepTask[]>([]);
+  const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchStepTasks = async () => {
+    const fetchTasks = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
         const response = await bakeryApi.getResources(selectedDate, selectedBaker);
         
-        console.log(response)
         // Ensure tasks is an array, default to empty array if undefined
         const tasksData = response?.task_resources || [];
-        
         setTasks(tasksData);
       } catch (err) {
         console.error('Error fetching baker tasks:', err);
@@ -40,13 +38,13 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
       }
     };
 
-    fetchStepTasks();
+    fetchTasks();
   }, [selectedDate, selectedBaker]);
 
-  const handleStatusChange = async (taskId: string, newStatus: StepTask['status']) => {
+  const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
     try {
       // Optimistic update
-      const updatedTasks = stepTasks.map(task => 
+      const updatedTasks = tasks.map(task => 
         task.id === taskId ? { ...task, status: newStatus } : task
       );
       
@@ -59,8 +57,9 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
       
       // Revert optimistic update if API call fails
       try {
-        const response = await bakeryApi.getTasks(selectedDate, selectedBaker);
-        setTasks(response?.tasks || []);
+        const response = await bakeryApi.getResources(selectedDate, selectedBaker);
+        const tasksData = response?.task_resources || [];
+        setTasks(tasksData);
       } catch (fetchErr) {
         console.error('Error refetching tasks:', fetchErr);
         setTasks([]);
@@ -68,7 +67,7 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
     }
   };
 
-  const getStatusColor = (status: StepTask['status']) => {
+  const getStatusColor = (status: TaskStatus | undefined) => {
     switch(status) {
       case 'completed': return 'bg-green-100 border-green-500';
       case 'in-progress': return 'bg-blue-100 border-blue-500';
@@ -77,8 +76,8 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
     }
   };
 
-  const formatTime = (time: Date) => {
-    return time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   if (isLoading) {
@@ -112,13 +111,13 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
       </div>
       
       {/* Tasks List */}
-      {stepTasks.length === 0 ? (
+      {tasks.length === 0 ? (
         <div className="text-center text-gray-500 py-4">
           No tasks scheduled for {selectedBaker} on {selectedDate}
         </div>
       ) : (
         <div className="space-y-4">
-          {stepTasks.map((task) => (
+          {tasks.map((task) => (
             <div 
               key={task.id} 
               className={`border rounded-lg p-4 ${getStatusColor(task.status)} relative`}
@@ -127,44 +126,39 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
                   <ChefHat size={20} className="text-gray-600" />
-                  <h3 className="font-semibold text-lg">{task.action}</h3>
+                  <h3 className="font-semibold text-lg">{task.name || task.step}</h3>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Clock size={16} className="text-gray-500" />
-                  <span className="text-sm text-gray-600">{formatTime(task.time)}</span>
+                  <span className="text-sm text-gray-600">{formatTime(task.startTime)}</span>
                 </div>
               </div>
 
               {/* Task Details */}
               <div className="mb-2">
-                <p className="text-sm text-gray-700">{task.details}</p>
-                <p className="text-sm text-gray-500">Equipment: {task.equipment}</p>
+                <p className="text-sm text-gray-700">Batch Size: {task.batchSize}</p>
+                <p className="text-sm text-gray-700">Product: {task.product?.name}</p>
+                <p className="text-sm text-gray-500">Step: {task.step}</p>
+                {task.resources.length > 0 && (
+                  <p className="text-sm text-gray-500">Equipment: {task.resources.join(', ')}</p>
+                )}
               </div>
 
               {/* Dependencies */}
-              {task.dependencies && task.dependencies.length > 0 && (
+              {task.dependencies && (
                 <div className="mt-2 border-t pt-2">
                   <div className="flex items-center text-sm text-gray-600">
                     <ArrowRight size={16} className="mr-2" />
-                    <span>Dependencies:</span>
+                    <span>Dependencies: {task.dependencies}</span>
                   </div>
-                  {task.dependencies.map((dep, depIndex) => (
-                    <div 
-                      key={depIndex} 
-                      className={`ml-6 text-sm ${dep.urgent ? 'text-red-600 font-semibold' : 'text-gray-500'}`}
-                    >
-                      {dep.urgent && <span className="mr-1">🚨</span>}
-                      From {dep.from}: {dep.what}
-                    </div>
-                  ))}
                 </div>
               )}
 
               {/* Status Selector */}
               <div className="mt-2">
                 <select 
-                  value={task.status}
-                  onChange={(e) => handleStatusChange(task.id, e.target.value as StepTask['status'])}
+                  value={task.status || 'pending'}
+                  onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
                   className="w-full p-1 border rounded text-sm"
                 >
                   <option value="pending">Pending</option>

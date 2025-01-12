@@ -1,170 +1,188 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { bakeryApi } from '../api/bakeryApi';
-
-
 import { 
   ChevronLeft, 
   ChevronRight, 
-  BarChart2,
-  Calendar
+  BarChart2
 } from 'lucide-react';
 import { Alert } from '../ui/Alert';
 import Gantt from 'frappe-gantt';
 import 'frappe-gantt/dist/frappe-gantt.css';
 
-
 import { 
   ScheduledTask, 
   PRODUCTION_STEPS, 
-  VIEW_MODES, 
-  STEP_COLORS, 
-  STEP_HOVER_COLORS,
-  ViewMode,
+  VIEW_MODES,
+  FrappeViewMode, 
+  STEP_COLORS,
   TaskStatus,
-  Product,
-  Task,
-  EnrichedTask,
+  GanttTask,
+  BaseTask,
+  formatDateToISO,
+  isGanttTask
 } from '../types/index';
 
+interface GanttChartProps {
+  tasks: ScheduledTask[];
+  viewMode: FrappeViewMode;
+  filteredSteps: Set<string>;
+  onTasksUpdate?: (tasks: ScheduledTask[]) => void;
+  onDateChange?: (task: ScheduledTask, start: Date, end: Date) => void;
+  onProgressChange?: (task: ScheduledTask, progress: number) => void;
+}
 
-const GanttChart: React.FC<{
-    tasks: ScheduledTask[];
-    viewMode: ViewMode;
-    filteredSteps: Set<string>; // add this prop
-    onTasksUpdate?: (tasks: ScheduledTask[]) => void;
-    onDateChange?: (task: ScheduledTask, start: Date, end: Date) => void;
-    onProgressChange?: (task: ScheduledTask, progress: number) => void;
-  }> = ({ tasks, viewMode, filteredSteps, onTasksUpdate, onDateChange, onProgressChange }) => {
-   
-
-
+const GanttChart: React.FC<GanttChartProps> = ({ 
+  tasks, 
+  viewMode, 
+  filteredSteps, 
+  onTasksUpdate, 
+  onDateChange, 
+  onProgressChange 
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const ganttRef = useRef<any>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  // Transform ScheduledTask to Task
-  const transformToGanttTasks = (tasks: ScheduledTask[]): Task[] => {
+  // Transform ScheduledTask to GanttTask
+  const transformToGanttTasks = (tasks: ScheduledTask[]): GanttTask[] => {
     return tasks
       .filter(task => filteredSteps.has(task.step))
       .map(task => ({
         id: task.orderId + '-' + task.step,
-        name: `${task.product?.name} (${task.batchSize})`,
-        start: task.startTime,
-        end: task.endTime,
+        name: `${task.product?.name || 'Unnamed'} (${task.batchSize})`,
+        start: task.startTime.toLocaleString(),
+        end: task.endTime.toLocaleString(),
         progress: task.status === 'completed' ? 100 : 
                  task.status === 'in-progress' ? 50 : 0,
         dependencies: Array.isArray(task.dependencies) ? task.dependencies.join(',') : '',
         custom_class: `step-${task.step}`,
-        originalTask: task
+        _data: { originalTask: task }
       }));
   };
 
   useEffect(() => {
-    if (containerRef.current && tasks.length > 0) {
-      if (ganttRef.current) {
-        containerRef.current.querySelector('.gantt-container')?.remove();
-      }
+    if (!containerRef.current || tasks.length === 0) return;
 
-      // Create wrapper structure
-      const wrapper = document.createElement('div');
-      wrapper.className = 'gantt-wrapper';
-      wrapper.style.display = 'flex';
-      wrapper.style.width = '100%';
-      wrapper.style.height = '100%';
-      containerRef.current.appendChild(wrapper);
-
-      // Create Gantt container
-      const ganttContainer = document.createElement('div');
-      ganttContainer.className = 'gantt-container';
-      ganttContainer.style.flexGrow = '1';
-      ganttContainer.style.overflow = 'auto';
-      wrapper.appendChild(ganttContainer);
-
-      const ganttTasks = transformToGanttTasks(tasks);
-      ganttRef.current = new Gantt(ganttContainer, ganttTasks, {
-        view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
-        view_mode: viewMode,
-        date_format: 'YYYY-MM-DD HH:mm:ss',
-        custom_popup_html: (task: Task) => {
-          const originalTask = task. ._data.originalTask;
-          return `
-            <div class="details-container bg-white p-4 rounded shadow-lg border">
-              <h5 class="font-bold mb-2">${originalTask.product?.name}</h5>
-              <p>Status: ${originalTask.status || 'Pending'}</p>
-              <p>Progress: ${task.progress}%</p>
-              <p>Start: ${originalTask.startTime.toLocaleString()}</p>
-              <p>End: ${originalTask.endTime.toLocaleString()}</p>
-              <p>Batch Size: ${originalTask.batchSize}</p>
-              <p>Dependencies: ${originalTask.dependencies}</p>
-            </div>
-          `;
-        },
-        on_click: (task: Task) => {
-          console.log('Task clicked:', task.originalTask);
-        },
-        on_date_change: (task: Task, start: Date, end: Date) => {
-          onDateChange?.(task._data.originalTask, start, end);
-        },
-        on_progress_change: (task: Task, progress: number) => {
-          onProgressChange?.(task._data.originalTask, progress);
-        }
-      });
-      });
-
-      // Add custom styling
-      const style = document.createElement('style');
-      style.textContent = `
-        .gantt .grid-header {
-          fill: #f3f4f6;
-        }
-        .gantt .lower-text, .gantt .upper-text {
-          font-size: 12px;
-          font-weight: 500;
-        }
-        .gantt .bar-wrapper:hover .bar {
-          fill: #2563eb;
-        }
-        .gantt .bar {
-          transition: fill 0.3s ease;
-        }
-        .gantt .bar-label {
-          fill: white;
-          font-size: 12px;
-          font-weight: 500;
-        }
-        .details-container {
-          background: white;
-          padding: 12px;
-          border-radius: 6px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          font-size: 12px;
-        }
-        ${PRODUCTION_STEPS.map(step => `
-          .gantt .bar-wrapper.step-${step} .bar {
-            fill: ${STEP_COLORS[step].replace('bg-', '#')};
-          }
-          .gantt .bar-wrapper.step-${step} .bar-progress {
-            fill: ${STEP_COLORS[step].replace('bg-', '#')}cc;
-          }
-        `).join('\n')}
-      `;
-      document.head.appendChild(style);
-
-      // Sync scroll between grid and timeline
-      const gridBody = ganttContainer.querySelector('.grid-body');
-      const timelineBody = ganttContainer.querySelector('.timeline-body');
-      
-      if (gridBody && timelineBody) {
-        gridBody.addEventListener('scroll', () => {
-          timelineBody.scrollTop = gridBody.scrollTop;
-        });
-        
-        timelineBody.addEventListener('scroll', () => {
-          gridBody.scrollTop = timelineBody.scrollTop;
-        });
-      }
+    if (ganttRef.current) {
+      containerRef.current.querySelector('.gantt-container')?.remove();
     }
-  }, [tasks, viewMode]);
+
+    // Create wrapper structure
+    const wrapper = document.createElement('div');
+    wrapper.className = 'gantt-wrapper';
+    wrapper.style.display = 'flex';
+    wrapper.style.width = '100%';
+    wrapper.style.height = '100%';
+    containerRef.current.appendChild(wrapper);
+
+    // Create Gantt container
+    const ganttContainer = document.createElement('div');
+    ganttContainer.className = 'gantt-container';
+    ganttContainer.style.flexGrow = '1';
+    ganttContainer.style.overflow = 'auto';
+    wrapper.appendChild(ganttContainer);
+
+    const ganttTasks = transformToGanttTasks(tasks);
+    
+    ganttRef.current = new Gantt(ganttContainer, ganttTasks, {
+      view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
+      view_mode: viewMode,
+      date_format: 'YYYY-MM-DD HH:mm:ss',
+      custom_popup_html: (task: BaseTask) => {
+        if (!isGanttTask(task)) return '';
+        const originalTask = task._data.originalTask;
+        return `
+          <div class="details-container bg-white p-4 rounded shadow-lg border">
+            <h5 class="font-bold mb-2">${originalTask.product?.name || 'Unnamed'}</h5>
+            <p>Status: ${originalTask.status || 'Pending'}</p>
+            <p>Progress: ${task.progress}%</p>
+            <p>Start: ${new Date(task.start).toLocaleString()}</p>
+            <p>End: ${new Date(task.end).toLocaleString()}</p>
+            <p>Batch Size: ${originalTask.batchSize}</p>
+            <p>Dependencies: ${originalTask.dependencies || 'None'}</p>
+          </div>
+        `;
+      },
+      on_click: (task: BaseTask) => {
+        if (!isGanttTask(task)) return;
+        console.log('Task clicked:', task._data.originalTask);
+      },
+      on_date_change: (task: BaseTask, start: Date, end: Date) => {
+        if (!isGanttTask(task)) return;
+        if (onDateChange) {
+          onDateChange(task._data.originalTask, start, end);
+        }
+      },
+      on_progress_change: (task: BaseTask, progress: number) => {
+        if (!isGanttTask(task)) return;
+        if (onProgressChange) {
+          onProgressChange(task._data.originalTask, progress);
+        }
+      }
+    });
+
+    // Add custom styling
+    const style = document.createElement('style');
+    style.textContent = `
+      .gantt .grid-header {
+        fill: #f3f4f6;
+      }
+      .gantt .lower-text, .gantt .upper-text {
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .gantt .bar-wrapper:hover .bar {
+        fill: #2563eb;
+      }
+      .gantt .bar {
+        transition: fill 0.3s ease;
+      }
+      .gantt .bar-label {
+        fill: white;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .details-container {
+        background: white;
+        padding: 12px;
+        border-radius: 6px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        font-size: 12px;
+      }
+      ${PRODUCTION_STEPS.map(step => `
+        .gantt .bar-wrapper.step-${step} .bar {
+          fill: ${STEP_COLORS[step].replace('bg-', '#')};
+        }
+        .gantt .bar-wrapper.step-${step} .bar-progress {
+          fill: ${STEP_COLORS[step].replace('bg-', '#')}cc;
+        }
+      `).join('\n')}
+    `;
+    document.head.appendChild(style);
+
+    // Sync scroll between grid and timeline
+    const gridBody = ganttContainer.querySelector('.grid-body');
+    const timelineBody = ganttContainer.querySelector('.timeline-body');
+    
+    if (gridBody && timelineBody) {
+      gridBody.addEventListener('scroll', () => {
+        timelineBody.scrollTop = gridBody.scrollTop;
+      });
+      
+      timelineBody.addEventListener('scroll', () => {
+        gridBody.scrollTop = timelineBody.scrollTop;
+      });
+    }
+
+    return () => {
+      // Cleanup
+      style.remove();
+      if (containerRef.current) {
+        const container = containerRef.current.querySelector('.gantt-container');
+        if (container) container.remove();
+      }
+    };
+  }, [tasks, viewMode, filteredSteps, onDateChange, onProgressChange]);
 
   useEffect(() => {
     if (ganttRef.current) {
@@ -182,142 +200,7 @@ const GanttChart: React.FC<{
         <div ref={sidebarRef} className="sidebar-content">
           {tasks.map(task => (
             <div 
-              key={task.id}
-              className="h-12 flex items-center px-4 border-b text-sm text-gray-700 capitalize"
-            >
-              {task.step}
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      {/* Gantt container */}
-      <div ref={containerRef} className="flex-1 overflow-x-auto">
-        {/* Frappe Gantt will be initialized here */}
-      </div>
-    </div>
-  );
-}; = ({ tasks, viewMode, onTasksUpdate, onDateChange, onProgressChange }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const ganttRef = useRef<any>(null);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (containerRef.current && tasks.length > 0) {
-      if (ganttRef.current) {
-        containerRef.current.querySelector('.gantt-container')?.remove();
-      }
-
-      // Create wrapper structure
-      const wrapper = document.createElement('div');
-      wrapper.className = 'gantt-wrapper';
-      wrapper.style.display = 'flex';
-      wrapper.style.width = '100%';
-      wrapper.style.height = '100%';
-      containerRef.current.appendChild(wrapper);
-
-      // Create Gantt container
-      const ganttContainer = document.createElement('div');
-      ganttContainer.className = 'gantt-container';
-      ganttContainer.style.flexGrow = '1';
-      ganttContainer.style.overflow = 'auto';
-      wrapper.appendChild(ganttContainer);
-
-      ganttRef.current = new Gantt(ganttContainer, tasks, {
-        view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
-        view_mode: viewMode,
-        date_format: 'YYYY-MM-DD HH:mm:ss',
-        custom_popup_html: (task) => {
-          return `
-            <div class="details-container bg-white p-4 rounded shadow-lg border">
-              <h5 class="font-bold mb-2">${task.name}</h5>
-              <p>Status: ${task.status || 'Pending'}</p>
-              <p>Progress: ${task.progress}%</p>
-              <p>Start: ${task.start.toLocaleString()}</p>
-              <p>End: ${task.end.toLocaleString()}</p>
-              ${task.dependencies ? `<p>Dependencies: ${task.dependencies}</p>` : ''}
-            </div>
-          `;
-        },
-        on_click: (task) => {
-          console.log('Task clicked:', task);
-        },
-        on_date_change: onDateChange,
-        on_progress_change: onProgressChange
-      });
-
-      // Add custom styling
-      const style = document.createElement('style');
-      style.textContent = `
-        .gantt .grid-header {
-          fill: #f3f4f6;
-        }
-        .gantt .lower-text, .gantt .upper-text {
-          font-size: 12px;
-          font-weight: 500;
-        }
-        .gantt .bar-wrapper:hover .bar {
-          fill: #2563eb;
-        }
-        .gantt .bar {
-          transition: fill 0.3s ease;
-        }
-        .gantt .bar-label {
-          fill: white;
-          font-size: 12px;
-          font-weight: 500;
-        }
-        .details-container {
-          background: white;
-          padding: 12px;
-          border-radius: 6px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          font-size: 12px;
-        }
-        ${PRODUCTION_STEPS.map(step => `
-          .gantt .bar-wrapper.step-${step} .bar {
-            fill: ${STEP_COLORS[step].replace('bg-', '#')};
-          }
-          .gantt .bar-wrapper.step-${step} .bar-progress {
-            fill: ${STEP_COLORS[step].replace('bg-', '#')}cc;
-          }
-        `).join('\n')}
-      `;
-      document.head.appendChild(style);
-
-      // Sync scroll between grid and timeline
-      const gridBody = ganttContainer.querySelector('.grid-body');
-      const timelineBody = ganttContainer.querySelector('.timeline-body');
-      
-      if (gridBody && timelineBody) {
-        gridBody.addEventListener('scroll', () => {
-          timelineBody.scrollTop = gridBody.scrollTop;
-        });
-        
-        timelineBody.addEventListener('scroll', () => {
-          gridBody.scrollTop = timelineBody.scrollTop;
-        });
-      }
-    }
-  }, [tasks, viewMode]);
-
-  useEffect(() => {
-    if (ganttRef.current) {
-      ganttRef.current.change_view_mode(viewMode);
-    }
-  }, [viewMode]);
-
-  return (
-    <div className="gantt-wrapper flex h-full">
-      {/* Sticky sidebar */}
-      <div className="sticky left-0 z-10 w-48 bg-white border-r shadow-sm">
-        <div className="h-16 border-b flex items-center px-4 font-medium text-gray-700">
-          Process Step
-        </div>
-        <div ref={sidebarRef} className="sidebar-content">
-          {tasks.map(task => (
-            <div 
-              key={task.id}
+              key={`${task.orderId}-${task.step}`}
               className="h-12 flex items-center px-4 border-b text-sm text-gray-700 capitalize"
             >
               {task.step}
@@ -336,7 +219,7 @@ const GanttChart: React.FC<{
 
 const GanttView: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [currentView, setCurrentView] = useState<ViewMode>('Day');
+  const [currentView, setCurrentView] = useState<FrappeViewMode>('Day');
   const [schedule, setSchedule] = useState<ScheduledTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -366,33 +249,33 @@ const GanttView: React.FC = () => {
     fetchSchedule();
   }, [selectedDate]);
 
-  const transformToGanttTasks = (tasks: ScheduledTask[]): Task[] => {
-    return tasks
-      .filter(task => filteredSteps.has(task.step))
-      .map(task => ({
-        id: task.orderId + '-' + task.step,
-        name: `${task.product?.name} (${task.batchSize})`,
-        start: task.startTime,
-        end: task.endTime,
-        progress: task.status === 'completed' ? 100 : 
-                 task.status === 'in-progress' ? 50 : 0,
-        dependencies: Array.isArray(task.dependencies) ? task.dependencies.join(',') : '',
-        custom_class: `step-${task.step}`,
-        status: task.status,
-        step: task.step,
-        product: task.product,
-        batchSize: task.batchSize
-      }));
+  const handleDateChange = async (task: ScheduledTask, start: Date, end: Date) => {
+    try {
+      await bakeryApi.updateTaskTiming(task.id, start, end);
+      // Refresh schedule after update
+      const response = await bakeryApi.getSchedule(selectedDate, true);
+      if (response && response.schedule) {
+        setSchedule(response.schedule);
+      }
+    } catch (error) {
+      setError('Failed to update task timing');
+    }
   };
 
-  const handleDateChange = (task: any, start: Date, end: Date) => {
-    console.log('Date changed:', task, start, end);
-    // Here you would update the backend
-  };
-
-  const handleProgressChange = (task: any, progress: number) => {
-    console.log('Progress changed:', task, progress);
-    // Here you would update the backend
+  const handleProgressChange = async (task: ScheduledTask, progress: number) => {
+    try {
+      const status = progress === 100 ? 'completed' as TaskStatus : 
+                     progress > 0 ? 'in-progress' as TaskStatus : 
+                     'pending' as TaskStatus;
+      await bakeryApi.updateTaskStatus(task.id, status);
+      // Refresh schedule after update
+      const response = await bakeryApi.getSchedule(selectedDate, true);
+      if (response && response.schedule) {
+        setSchedule(response.schedule);
+      }
+    } catch (error) {
+      setError('Failed to update task status');
+    }
   };
 
   const toggleStep = (step: string) => {
@@ -471,7 +354,7 @@ const GanttView: React.FC = () => {
           <div className="flex items-center space-x-4">
             {/* View Mode Selector */}
             <div className="flex bg-gray-100 rounded-lg p-1">
-              {(['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'] as ViewMode[]).map((mode) => (
+              {(['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'] as FrappeViewMode[]).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setCurrentView(mode)}
@@ -493,79 +376,76 @@ const GanttView: React.FC = () => {
                   className={`px-3 py-1 rounded-md text-sm transition-colors ${
                     filteredSteps.has(step) 
                       ? `${STEP_COLORS[step]} text-white` 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {step}
-                </button>
-              ))}
-            </div>
-
-            {/* Resource Utilization Toggle */}
-            <button
-              onClick={() => setShowResourceUtilization(!showResourceUtilization)}
-              className={`flex items-center space-x-2 px-3 py-1 rounded-md ${
-                showResourceUtilization ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 hover:bg-gray-200'
-              }`}
-            >
-              <BarChart2 className="w-4 h-4" />
-              <span>Utilization</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full">
-        <GanttChart
-  tasks={schedule}
-  viewMode={currentView}
-  filteredSteps={filteredSteps} // pass filteredSteps here
-  onTasksUpdate={setSchedule}
-  onDateChange={handleDateChange}
-  onProgressChange={handleProgressChange}
-/>
-
-        </div>
-      </div>
-
-      {/* Resource Utilization Modal */}
-      {showResourceUtilization && (
-        <div className="fixed top-4 right-4 bg-white rounded-lg shadow-xl p-6 w-96 z-50">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold text-lg">Resource Utilization</h3>
-            <button 
-              onClick={() => setShowResourceUtilization(false)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="space-y-4">
-            {utilization?.map((resource: any) => (
-              <div key={resource.resource} className="flex flex-col">
-                <div className="flex justify-between text-sm mb-1">
-                  <span>{resource.resource}</span>
-                  <span>{Math.round(resource.utilization_percentage)}%</span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2.5">
-                  <div 
-                    className={`rounded-full h-2.5 transition-all duration-300 ${
-                      resource.utilization_percentage > 90 ? 'bg-red-500' :
-                      resource.utilization_percentage > 70 ? 'bg-orange-500' :
-                      'bg-green-500'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                      >
+                        {step}
+                      </button>
+                    ))}
+                  </div>
+      
+                  {/* Resource Utilization Toggle */}
+                  <button
+                    onClick={() => setShowResourceUtilization(!showResourceUtilization)}
+                    className={`flex items-center space-x-2 px-3 py-1 rounded-md ${
+                      showResourceUtilization ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 hover:bg-gray-200'
                     }`}
-                    style={{ width: `${resource.utilization_percentage}%` }}
-                  />
+                  >
+                    <BarChart2 className="w-4 h-4" />
+                    <span>Utilization</span>
+                  </button>
                 </div>
               </div>
-            ))}
+            </div>
+      
+            {/* Main Content */}
+            <div className="flex-1 overflow-hidden">
+              <div className="h-full">
+                <GanttChart
+                  tasks={schedule}
+                  viewMode={currentView}
+                  filteredSteps={filteredSteps}
+                  onDateChange={handleDateChange}
+                  onProgressChange={handleProgressChange}
+                />
+              </div>
+            </div>
+      
+            {/* Resource Utilization Modal */}
+            {showResourceUtilization && utilization && (
+              <div className="fixed top-4 right-4 bg-white rounded-lg shadow-xl p-6 w-96 z-50">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-semibold text-lg">Resource Utilization</h3>
+                  <button 
+                    onClick={() => setShowResourceUtilization(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  {utilization.map((resource: any) => (
+                    <div key={resource.resource} className="flex flex-col">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>{resource.resource}</span>
+                        <span>{Math.round(resource.utilization_percentage)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2.5">
+                        <div 
+                          className={`rounded-full h-2.5 transition-all duration-300 ${
+                            resource.utilization_percentage > 90 ? 'bg-red-500' :
+                            resource.utilization_percentage > 70 ? 'bg-orange-500' :
+                            'bg-green-500'
+                          }`}
+                          style={{ width: `${resource.utilization_percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default GanttView;
+        );
+      };
+      
+      export default GanttView;

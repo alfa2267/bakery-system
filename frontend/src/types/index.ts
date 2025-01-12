@@ -1,5 +1,36 @@
 // src/types/index.ts
 
+// Define the base task interface that matches Frappe Gantt's structure
+export interface BaseTask {
+  id: string;
+  name: string;
+  start: string;
+  end: string;
+  progress: number;
+  dependencies: string;
+  custom_class?: string;
+}
+
+// Our custom task interface
+export interface GanttTask extends BaseTask {
+  custom_class: string;
+  _data: {
+    originalTask: ScheduledTask;
+  };
+}
+
+// Validation Response interface
+export interface ValidationResponse {
+  isValid: boolean;
+  warnings: string[];
+  errors?: string[];
+  conflicts?: {
+    type: string;
+    message: string;
+    details?: any;
+  }[];
+}
+
 // Basic interfaces
 export interface Product {
   id: number;
@@ -56,73 +87,33 @@ export interface Order {
   updated_at?: string;
 }
 
+// Type definitions
 export type OrderStatus = 'new' | 'pending' | 'in-progress' | 'completed' | 'cancelled';
-
+export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'blocked';
 export type ProductionStep = 'mixing' | 'chilling' | 'shaping' | 'baking' | 'cooling' | 'proofing';
+export type FrappeViewMode = 'Quarter Day' | 'Half Day' | 'Day' | 'Week' | 'Month';
+export type ViewMode = FrappeViewMode | 'Minute' | 'Hour';
 
 
-// Scheduling and Task-related Interfaces
-
-
-export interface Task {
-  originalTask: any;
-  start: string;
-  id: string;
-  name: string;
-  end: string;
-  progress: number;
-  dependencies: string;
-  // other properties
-}
-
-export interface EnrichedTask{
-  originalTask: ScheduledTask;  // Add the missing property here
-  // other properties specific to EnrichedTask
-}
-
-
-// Scheduling and Task-related Interfaces
 export interface ScheduledTask {
   id: string;
   orderId: string;
   step: ProductionStep;
   startTime: Date;
   endTime: Date;
-  resources: string[];
+  resources: Resource[];
   batchSize: number;
   dependencies: string | '';
   status?: TaskStatus;
-  name?: string | undefined;
+  name?: string;
   product?: Product;
 }
 
-export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'blocked';
-
-export interface StepTask {
+export interface Resource {
   id: string;
-  time: Date;
-  action: string;
-  details: string;
-  equipment: string;
-  status: TaskStatus;
-  dependencies?: {
-    from: string;
-    what: string;
-    urgent: boolean;
-  }[];
+  name: string;
 }
 
-export interface DeliverySlot {
-  id: string;
-  time: string;
-}
-
-export interface ValidationResponse {
-  isValid: boolean;
-  warnings: string[];
-}
-
-// Gantt-related Interfaces and Configurations
 export interface GanttOptions {
   viewMode?: ViewMode;
   barHeight?: number;
@@ -136,22 +127,18 @@ export interface GanttOptions {
   };
 }
 
-export type ViewMode = 
-  | 'Minute' 
-  | 'Hour' 
-  | 'Quarter Day' 
-  | 'Half Day' 
-  | 'Day' 
-  | 'Week' 
-  | 'Month';
-
 export interface ViewModeConfig {
   hours: number[];
   columnWidth: number;
   label: (date: Date) => string;
 }
 
-// Default Configuration Constants
+// Type guard for runtime checking
+export function isGanttTask(task: any): task is GanttTask {
+  return task && '_data' in task && task._data?.originalTask !== undefined;
+}
+
+// Constants
 export const DEFAULT_OPTIONS: GanttOptions = {
   viewMode: 'Day',
   barHeight: 30,
@@ -165,7 +152,9 @@ export const DEFAULT_OPTIONS: GanttOptions = {
   }
 };
 
-export const PRODUCTION_STEPS: ProductionStep[] = ['mixing', 'chilling', 'shaping', 'baking', 'cooling', 'proofing'];
+export const PRODUCTION_STEPS: ProductionStep[] = [
+  'mixing', 'chilling', 'shaping', 'baking', 'cooling', 'proofing'
+];
 
 export const STEP_COLORS: Record<ProductionStep, string> = {
   mixing: 'bg-blue-500',
@@ -237,6 +226,7 @@ export const VIEW_MODES: Record<ViewMode, ViewModeConfig> = {
   }
 };
 
+// Utility functions
 export const formatDateToISO = (date: Date): string => {
   return date.toISOString();
 };
