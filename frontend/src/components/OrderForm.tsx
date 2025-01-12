@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Order, OrderItem, Recipe, Product } from '../types';
-import Alert from '../ui/Alert';
+import {Alert} from '../ui/Alert';
 import { bakeryApi } from '../api/bakeryApi';
 
 const OrderForm: React.FC = () => {

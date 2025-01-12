@@ -60,18 +60,39 @@ export type OrderStatus = 'new' | 'pending' | 'in-progress' | 'completed' | 'can
 
 export type ProductionStep = 'mixing' | 'chilling' | 'shaping' | 'baking' | 'cooling' | 'proofing';
 
+
+// Scheduling and Task-related Interfaces
+
+
+export interface Task {
+  originalTask: any;
+  start: string;
+  id: string;
+  name: string;
+  end: string;
+  progress: number;
+  dependencies: string;
+  // other properties
+}
+
+export interface EnrichedTask{
+  originalTask: ScheduledTask;  // Add the missing property here
+  // other properties specific to EnrichedTask
+}
+
+
 // Scheduling and Task-related Interfaces
 export interface ScheduledTask {
+  id: string;
   orderId: string;
   step: ProductionStep;
   startTime: Date;
   endTime: Date;
   resources: string[];
   batchSize: number;
+  dependencies: string | '';
   status?: TaskStatus;
-  name?: string;
-  dependencies?: string[];
-  progress?: number;
+  name?: string | undefined;
   product?: Product;
 }
 
