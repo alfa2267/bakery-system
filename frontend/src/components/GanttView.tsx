@@ -5,14 +5,13 @@ import Select, { ActionMeta, MultiValue } from 'react-select';
 import { 
   ChevronLeft, 
   ChevronRight, 
-  BarChart2
+  BarChart2,
+  LayersIcon
 } from 'lucide-react';
 import { Alert } from '../ui/Alert';
 
-
 import Gantt from 'frappe-gantt';
 import '../../node_modules/frappe-gantt/dist/frappe-gantt.css';
-
 
 import { 
   ScheduledTask,
@@ -27,12 +26,18 @@ import {
   isGanttTask,
   GanttChartProps
 } from '../types/index';
-import { Tooltip } from 'recharts';
 
-const GanttChart: React.FC<GanttChartProps> = ({ 
+type GroupingMode = 'step' | 'product';
+
+interface ExtendedGanttChartProps extends GanttChartProps {
+  groupingMode: GroupingMode;
+}
+
+const GanttChart: React.FC<ExtendedGanttChartProps> = ({ 
   tasks, 
   viewMode, 
   filteredSteps, 
+  groupingMode,
   onTasksUpdate, 
   onDateChange, 
   onProgressChange 
@@ -41,7 +46,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
   const ganttRef = useRef<any>(null);
 
   const transformToGanttTasks = useCallback((tasks: ScheduledTask[]): GanttTask[] => {
-    // If no tasks, create placeholder tasks for each production step
     if (tasks.length === 0) {
       return PRODUCTION_STEPS
         .filter(step => filteredSteps.has(step))
@@ -49,7 +53,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
           id: `placeholder-${step}`,
           name: `Placeholder ${step}`,
           start: new Date().toISOString(),
-          end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours later
+          end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           progress: 0,
           dependencies: '',
           custom_class: `step-${step}`,
@@ -63,38 +67,60 @@ const GanttChart: React.FC<GanttChartProps> = ({
               resources: [],
               batchSize: 0,
               dependencies: '',
-              status: 'pending'
+              status: 'pending',
             } 
           }
         }));
     }
 
-    // Existing transformation logic
-    return tasks
-      .filter(task => filteredSteps.has(task.step))
-      .map(task => {
-        const startTime = task.startTime instanceof Date 
-          ? task.startTime 
-          : new Date(task.startTime);
-        const endTime = task.endTime instanceof Date 
-          ? task.endTime 
-          : new Date(task.endTime);
+    const filteredTasks = tasks.filter(task => filteredSteps.has(task.step));
 
-        const ganttTask: GanttTask = {
+    if (groupingMode === 'product') {
+      // Group by product first
+      const tasksByProduct = new Map<string, ScheduledTask[]>();
+      filteredTasks.forEach(task => {
+        const productName = task.product?.name || 'Unnamed Product';
+        if (!tasksByProduct.has(productName)) {
+          tasksByProduct.set(productName, []);
+        }
+        tasksByProduct.get(productName)?.push(task);
+      });
+
+      // Convert to Gantt tasks maintaining product grouping
+      return Array.from(tasksByProduct.entries()).flatMap(([productName, productTasks]) => {
+        return productTasks.map(task => ({
           id: task.orderId + '-' + task.step,
-          name: `${task.product?.name || 'Unnamed'} (${task.batchSize})`,
-          start: startTime.toISOString(),
-          end: endTime.toISOString(),
+          name: `${task.step} (${task.batchSize})`,
+          start: new Date(task.startTime).toISOString(),
+          end: new Date(task.endTime).toISOString(),
           progress: task.status === 'completed' ? 100 : 
                    task.status === 'in-progress' ? 50 : 0,
           dependencies: Array.isArray(task.dependencies) ? task.dependencies.join(',') : '',
           custom_class: `step-${task.step}`,
-          _data: { originalTask: task }
-        };
-
-        return ganttTask;
+          _data: { 
+            originalTask: task,
+            groupName: productName
+          }
+        }));
       });
-  }, [filteredSteps]);
+    } else {
+      // Original step-based grouping
+      return filteredTasks.map(task => ({
+        id: task.orderId + '-' + task.step,
+        name: `${task.product?.name || 'Unnamed'} (${task.batchSize})`,
+        start: new Date(task.startTime).toISOString(),
+        end: new Date(task.endTime).toISOString(),
+        progress: task.status === 'completed' ? 100 : 
+                 task.status === 'in-progress' ? 50 : 0,
+        dependencies: Array.isArray(task.dependencies) ? task.dependencies.join(',') : '',
+        custom_class: `step-${task.step}`,
+        _data: { 
+          originalTask: task,
+          groupName: task.step
+        }
+      }));
+    }
+  }, [filteredSteps, groupingMode]);
 
   useEffect(() => {
     if (!containerRef.current || tasks.length === 0) return;
@@ -111,27 +137,39 @@ const GanttChart: React.FC<GanttChartProps> = ({
     sidebar.className = 'sticky left-0 z-10 w-48 bg-white border-r shadow-sm overflow-hidden';
     
     const sidebarHeader = document.createElement('div');
-    sidebarHeader.style.height = `${GANTT_CONFIG.headerHeight}px`;
-    sidebarHeader.className = `border-b flex items-center px-4 font-medium text-gray-700`;
-    sidebarHeader.textContent = 'Process Step';
+    sidebarHeader.style.height = '88px'; // Matches combined height of upper and lower headers
+    sidebarHeader.className = `border-b flex items-center justify-center px-4 font-medium text-gray-700 bg-gray-50`;
+    sidebarHeader.textContent = groupingMode === 'product' ? 'Products' : 'Process Steps';
     sidebar.appendChild(sidebarHeader);
 
     const sidebarContent = document.createElement('div');
     sidebarContent.className = 'sidebar-content overflow-y-auto';
     
-    const uniqueFilteredSteps = Array.from(new Set(
-      tasks
-        .map(task => task.step)
-        .filter(step => filteredSteps.has(step))
-    ));
+    // Get unique groups based on grouping mode
+    const getGroups = () => {
+      if (groupingMode === 'product') {
+        return new Set(tasks
+          .filter(task => filteredSteps.has(task.step))
+          .map(task => task.product?.name || 'Unnamed Product')
+        );
+      } else {
+        return new Set(tasks
+          .filter(task => filteredSteps.has(task.step))
+          .map(task => task.step)
+        );
+      }
+    };
 
-    uniqueFilteredSteps.forEach(step => {
-      const stepDiv = document.createElement('div');
-      stepDiv.style.height = `${GANTT_CONFIG.rowHeight}px`;
-      stepDiv.className = `flex items-center px-4 border-b text-sm text-gray-700 capitalize`;
-      stepDiv.textContent = step;
-      sidebarContent.appendChild(stepDiv);
+    const groups = getGroups();
+    
+    groups.forEach(group => {
+      const groupDiv = document.createElement('div');
+      groupDiv.style.height = `${GANTT_CONFIG.rowHeight}px`;
+      groupDiv.className = `flex items-center px-4 border-b text-sm text-gray-700 capitalize`;
+      groupDiv.textContent = group || '';
+      sidebarContent.appendChild(groupDiv);
     });
+
     sidebar.appendChild(sidebarContent);
     wrapper.appendChild(sidebar);
 
@@ -141,19 +179,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
 
     const ganttTasks = transformToGanttTasks(tasks);
 
-    /* 
-
-
-               <p>Progress: ${task.progress}% </p>
-               <p>Start: ${new Date(task.start).toLocaleString()}</p>
-               <p>End: ${new Date(task.end).toLocaleString()}</p>
-                 <p>Batch Size: ${task._data.originalTask?.batchSize}</p>
-               <p>Dependencies: ${task._data.originalTask?.dependencies || 'None'}</p> 
-
-               */
-
     try {
-
       ganttRef.current = new ExtendedGantt(ganttContainer, ganttTasks, {
         view_modes: [
           Gantt.VIEW_MODE.MINUTE,
@@ -167,29 +193,28 @@ const GanttChart: React.FC<GanttChartProps> = ({
         view_mode: viewMode,
         date_format: 'YYYY-MM-DD HH:mm:ss',
         row_height: GANTT_CONFIG.rowHeight,
-        bar_height: GANTT_CONFIG.rowHeight - 18, // Adjust bar height to fit the 60px row
+        bar_height: GANTT_CONFIG.rowHeight - 18,
         start: (task: BaseTask) => { return task.start; },
         end: (task: BaseTask) => { return task.end; },
         popup: (task: any) => {
-
-           task = task.task;
-           const tod = task._data.originalTask;
+          task = task.task;
+          const tod = task._data.originalTask;
           
-           return `
-             <div class="details-container bg-yellow p-4 rounded shadow-lg border">
-               <h5 class="font-bold mb-2"> ${task.name }</h5>
+          return `
+            <div class="details-container bg-yellow p-4 rounded shadow-lg border">
+              <h5 class="font-bold mb-2">${task.name}</h5>
+              <p>Product: ${tod.product?.name || 'Unnamed'}</p>
+              <p>Step: ${tod.step}</p>
               <p>Status: ${tod.status || 'Pending'}</p>
-              <p>Progress: ${task.progress}% </p>
-               <p>Start: ${new Date(task.start).toLocaleString()}</p>
-               <p>End: ${new Date(task.end).toLocaleString()}</p>
-                 <p>Batch Size: ${tod.batchSize}</p>
-               <p>Dependencies: ${tod.dependencies || 'None'}</p> 
-
-             </div>
-           `;
-         },
-         popup_on: 'click',
-
+              <p>Progress: ${task.progress}%</p>
+              <p>Start: ${new Date(task.start).toLocaleString()}</p>
+              <p>End: ${new Date(task.end).toLocaleString()}</p>
+              <p>Batch Size: ${tod.batchSize}</p>
+              <p>Dependencies: ${tod.dependencies || 'None'}</p>
+            </div>
+          `;
+        },
+        popup_on: 'click',
         on_click: (task: BaseTask) => {
           if (!isGanttTask(task)) return;
           console.log('Task clicked:', task._data.originalTask);
@@ -207,8 +232,6 @@ const GanttChart: React.FC<GanttChartProps> = ({
           }
         }
       });
-
-
     } catch (error) {
       console.error('Error creating Gantt chart:', error);
     }
@@ -248,14 +271,30 @@ const GanttChart: React.FC<GanttChartProps> = ({
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         font-size: 12px;
       }
-      ${PRODUCTION_STEPS.map(step => `
-        .gantt .bar-wrapper.step-${step} .bar {
-          fill: ${STEP_COLORS[step].replace('bg-', '#')};
-        }
-        .gantt .bar-wrapper.step-${step} .bar-progress {
-          fill: ${STEP_COLORS[step].replace('bg-', '#')}cc;
-        }
-      `).join('\n')}
+      ${PRODUCTION_STEPS.map(step => {
+        const stepColor = STEP_COLORS[step].replace('bg-', '');
+        const colorMap: Record<string, string> = {
+          'blue-500': '#3B82F6',
+          'green-500': '#22C55E',
+          'yellow-500': '#EAB308',
+          'red-500': '#EF4444',
+          'purple-500': '#A855F7',
+          'pink-500': '#EC4899',
+          'indigo-500': '#6366F1',
+        };
+        const color = colorMap[stepColor] || '#3B82F6';
+        return `
+          .gantt .bar-wrapper.step-${step} .bar {
+            fill: ${color};
+          }
+          .gantt .bar-wrapper.step-${step} .bar-progress {
+            fill: ${color}cc;
+          }
+          .gantt .bar-wrapper.step-${step}:hover .bar {
+            fill: ${color}dd;
+          }
+        `;
+      }).join('\n')}
     `;
     document.head.appendChild(style);
 
@@ -279,7 +318,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
         currentContainer.innerHTML = '';
       }
     };
-  }, [tasks, viewMode, filteredSteps, onDateChange, onProgressChange, transformToGanttTasks]);
+  }, [tasks, viewMode, filteredSteps, groupingMode, onDateChange, onProgressChange, transformToGanttTasks]);
 
   useEffect(() => {
     if (ganttRef.current) {
@@ -297,16 +336,18 @@ const GanttChart: React.FC<GanttChartProps> = ({
 const GanttView: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [currentView, setCurrentView] = useState<FrappeViewMode>('Day');
+  const [groupingMode, setGroupingMode] = useState<GroupingMode>('step');
   const [schedule, setSchedule] = useState<ScheduledTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showResourceUtilization, setShowResourceUtilization] = useState(false);
   const [filteredSteps, setFilteredSteps] = useState<Set<string>>(new Set(PRODUCTION_STEPS));
+  const [utilization, setUtilization] = useState<any>(null);
+
   const stepOptions = PRODUCTION_STEPS.map(step => ({
     value: step,
     label: step.charAt(0).toUpperCase() + step.slice(1),
   }));
-  const [utilization, setUtilization] = useState<any>(null);
 
   const handleStepFilterChange = (
     selectedOptions: MultiValue<{ value: string; label: string }>, 
@@ -367,8 +408,6 @@ const GanttView: React.FC = () => {
     }
   };
 
-  // Removed the unused toggleStep function
-
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -384,31 +423,78 @@ const GanttView: React.FC = () => {
       </Alert>
     );
   }
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b py-4 px-6">
-        <div className="flex justify-between items-center">
+      <div className="bg-white border-b py-3">
+        {/* Top Row - View Modes and Core Controls */}
+        <div className="px-4 flex justify-between items-center mb-3">
+          {/* View Mode Selector */}
+          <div className="flex bg-gray-100 rounded-lg p-0.5">
+            {(['Day', 'Week', 'Month', 'Quarter Day', 'Half Day'] as FrappeViewMode[]).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setCurrentView(mode)}
+                className={`px-2.5 py-1 text-sm rounded-md transition-colors ${
+                  currentView === mode ? 'bg-blue-500 text-white' : 'hover:bg-gray-200'
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+
+          {/* Core Controls */}
+          <div className="flex items-center space-x-3">
+            {/* Grouping Mode Selector */}
+            <div className="flex items-center space-x-2">
+              <select
+                id="grouping-mode"
+                value={groupingMode}
+                onChange={(e) => setGroupingMode(e.target.value as GroupingMode)}
+                className="px-2.5 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="step">Group by Step</option>
+                <option value="product">Group by Product</option>
+              </select>
+            </div>
+
+            {/* Resource Utilization Toggle */}
+            <button
+              onClick={() => setShowResourceUtilization(!showResourceUtilization)}
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md text-sm ${
+                showResourceUtilization ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 hover:bg-gray-200'
+              }`}
+            >
+              <BarChart2 className="w-4 h-4" />
+              <span>Utilization</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom Row - Date and Filters */}
+        <div className="px-4 flex justify-between items-start border-t pt-3">
           {/* Date Navigation */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             <button 
               onClick={() => {
                 const date = new Date(selectedDate);
                 date.setDate(date.getDate() - 1);
                 setSelectedDate(date.toISOString().split('T')[0]);
               }}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-4 h-4" />
             </button>
             <div className="flex flex-col">
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-1.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
               />
-              <span className="text-sm text-gray-500 mt-1">
+              <span className="text-xs text-gray-500 mt-0.5">
                 {new Date(selectedDate).toLocaleDateString(undefined, { 
                   weekday: 'long', 
                   year: 'numeric', 
@@ -423,114 +509,175 @@ const GanttView: React.FC = () => {
                 date.setDate(date.getDate() + 1);
                 setSelectedDate(date.toISOString().split('T')[0]);
               }}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="flex items-center space-x-4">
-            {/* View Mode Selector */}
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              {(['Minute', 'Hour', 'Quarter Day', 'Half Day', 'Day', 'Week', 'Month'] as FrappeViewMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setCurrentView(mode)}
-                  className={`px-3 py-1 rounded-md transition-colors ${
-                    currentView === mode ? 'bg-blue-500 text-white' : 'hover:bg-gray-200'
-                  }`}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-
-
-
-{/* Step Filters */}
-<div className="flex items-center space-x-2">
-
-<div className="mb-4">
-        <label htmlFor="step-filter" className="block text-sm font-medium text-gray-700">
-          Filter by Steps
-        </label>
-        <Select
-          id="step-filter"
-          isMulti
-          options={stepOptions}
-          value={stepOptions.filter(option => filteredSteps.has(option.value))}
-          onChange={handleStepFilterChange}
-          className="mt-2"
-          classNamePrefix="react-select"
-        />
+          {/* Step Filters */}
+          <div className="w-2/3">
+            <Select
+              id="step-filter"
+              isMulti
+              options={stepOptions}
+              value={stepOptions.filter(option => filteredSteps.has(option.value))}
+              onChange={handleStepFilterChange}
+              className="text-sm"
+              classNamePrefix="react-select"
+              placeholder="Filter steps..."
+              isSearchable={false}
+                            styles={{
+                control: (base) => ({
+                  ...base,
+                  minHeight: '32px',
+                }),
+                option: (base, { data, isSelected }) => {
+                  const stepColor = STEP_COLORS[data.value].replace('bg-', '');
+                  const colorMap: Record<string, string> = {
+                    'blue-500': '#3B82F6',
+                    'green-500': '#22C55E',
+                    'yellow-500': '#EAB308',
+                    'red-500': '#EF4444',
+                    'purple-500': '#A855F7',
+                    'pink-500': '#EC4899',
+                    'indigo-500': '#6366F1',
+                  };
+                  const color = colorMap[stepColor] || '#3B82F6';
+                  return {
+                    ...base,
+                    backgroundColor: isSelected ? color : base.backgroundColor,
+                    color: isSelected ? 'white' : base.color,
+                    borderLeft: `4px solid ${color}`,
+                    ':hover': {
+                      backgroundColor: isSelected ? color : `${color}20`,
+                    },
+                    padding: '8px 12px',
+                  };
+                },
+                dropdownIndicator: (base) => ({
+                  ...base,
+                  padding: '4px',
+                }),
+                clearIndicator: (base) => ({
+                  ...base,
+                  padding: '4px',
+                }),
+                multiValue: (base, { data }) => {
+                  const stepColor = STEP_COLORS[data.value].replace('bg-', '');
+                  const colorMap: Record<string, string> = {
+                    'blue-500': '#3B82F6',
+                    'green-500': '#22C55E',
+                    'yellow-500': '#EAB308',
+                    'red-500': '#EF4444',
+                    'purple-500': '#A855F7',
+                    'pink-500': '#EC4899',
+                    'indigo-500': '#6366F1',
+                  };
+                  const color = colorMap[stepColor] || '#3B82F6';
+                  return {
+                    ...base,
+                    backgroundColor: `${color}20`,
+                    border: `1px solid ${color}40`,
+                  };
+                },
+                multiValueLabel: (base, { data }) => {
+                  const stepColor = STEP_COLORS[data.value].replace('bg-', '');
+                  const colorMap: Record<string, string> = {
+                    'blue-500': '#3B82F6',
+                    'green-500': '#22C55E',
+                    'yellow-500': '#EAB308',
+                    'red-500': '#EF4444',
+                    'purple-500': '#A855F7',
+                    'pink-500': '#EC4899',
+                    'indigo-500': '#6366F1',
+                  };
+                  const color = colorMap[stepColor] || '#3B82F6';
+                  return {
+                    ...base,
+                    fontSize: '0.875rem',
+                    padding: '2px 6px',
+                    color: color,
+                  };
+                },
+                multiValueRemove: (base, { data }) => {
+                  const stepColor = STEP_COLORS[data.value].replace('bg-', '');
+                  const colorMap: Record<string, string> = {
+                    'blue-500': '#3B82F6',
+                    'green-500': '#22C55E',
+                    'yellow-500': '#EAB308',
+                    'red-500': '#EF4444',
+                    'purple-500': '#A855F7',
+                    'pink-500': '#EC4899',
+                    'indigo-500': '#6366F1',
+                  };
+                  const color = colorMap[stepColor] || '#3B82F6';
+                  return {
+                    ...base,
+                    padding: '0 4px',
+                    color: color,
+                    ':hover': {
+                      backgroundColor: `${color}30`,
+                      color: color,
+                    },
+                  };
+                },
+              }}
+            />
+          </div>
+        </div>
       </div>
 
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full">
+          <GanttChart
+            tasks={schedule}
+            viewMode={currentView}
+            filteredSteps={filteredSteps}
+            groupingMode={groupingMode}
+            onDateChange={handleDateChange}
+            onProgressChange={handleProgressChange}
+          />
+        </div>
+      </div>
 
-</div>
-
-{/* Resource Utilization Toggle */}
-<button
-  onClick={() => setShowResourceUtilization(!showResourceUtilization)}
-  className={`flex items-center space-x-2 px-3 py-1 rounded-md ${
-    showResourceUtilization ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 hover:bg-gray-200'
-  }`}
->
-  <BarChart2 className="w-4 h-4" />
-  <span>Utilization</span>
-</button>
-</div>
-</div>
-</div>
-
-{/* Main Content */}
-<div className="flex-1 overflow-hidden">
-<div className="h-full">
-<GanttChart
-tasks={schedule}
-viewMode={currentView}
-filteredSteps={filteredSteps}
-onDateChange={handleDateChange}
-onProgressChange={handleProgressChange}
-/>
-</div>
-</div>
-
-{/* Resource Utilization Modal */}
-{showResourceUtilization && utilization && (
-<div className="fixed top-4 right-4 bg-white rounded-lg shadow-xl p-6 w-96 z-50">
-<div className="flex justify-between items-center mb-4">
-<h3 className="font-semibold text-lg">Resource Utilization</h3>
-<button 
-  onClick={() => setShowResourceUtilization(false)}
-  className="text-gray-500 hover:text-gray-700"
->
-  ✕
-</button>
-</div>
-<div className="space-y-4">
-{utilization.map((resource: any) => (
-  <div key={resource.resource} className="flex flex-col">
-    <div className="flex justify-between text-sm mb-1">
-      <span>{resource.resource}</span>
-      <span>{Math.round(resource.utilization_percentage)}%</span>
+      {/* Resource Utilization Modal */}
+      {showResourceUtilization && utilization && (
+        <div className="fixed top-4 right-4 bg-white rounded-lg shadow-xl p-6 w-96 z-50">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-lg">Resource Utilization</h3>
+            <button 
+              onClick={() => setShowResourceUtilization(false)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="space-y-4">
+            {utilization.map((resource: any) => (
+              <div key={resource.resource} className="flex flex-col">
+                <div className="flex justify-between text-sm mb-1">
+                  <span>{resource.resource}</span>
+                  <span>{Math.round(resource.utilization_percentage)}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2.5">
+                  <div 
+                    className={`rounded-full h-2.5 transition-all duration-300 ${
+                      resource.utilization_percentage > 90 ? 'bg-red-500' :
+                      resource.utilization_percentage > 70 ? 'bg-orange-500' :
+                      'bg-green-500'
+                    }`}
+                    style={{ width: `${resource.utilization_percentage}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
-    <div className="w-full bg-gray-100 rounded-full h-2.5">
-      <div 
-        className={`rounded-full h-2.5 transition-all duration-300 ${
-          resource.utilization_percentage > 90 ? 'bg-red-500' :
-          resource.utilization_percentage > 70 ? 'bg-orange-500' :
-          'bg-green-500'
-        }`}
-        style={{ width: `${resource.utilization_percentage}%` }}
-      />
-    </div>
-  </div>
-))}
-</div>
-</div>
-)}
-</div>
-);
+  );
 };
 
 export default GanttView;
