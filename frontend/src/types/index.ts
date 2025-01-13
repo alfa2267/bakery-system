@@ -139,7 +139,7 @@ export function isGanttTask(task: any): task is GanttTask {
 
 // Constants
 export const DEFAULT_OPTIONS: GanttOptions = {
-  viewMode: 'Day',
+  viewMode: 'Day', 
   barHeight: 30,
   headerHeight: 65,
   padding: 18,
@@ -231,107 +231,30 @@ export const formatDateToISO = (date: Date): string => {
 };
 
 
-// Extended Frappe Gantt View Modes
+// Update the FrappeViewMode type to exactly match the strings you're using
 export type FrappeViewMode = 'Minute' | 'Hour' | 'Quarter Day' | 'Half Day' | 'Day' | 'Week' | 'Month';
 
 
-// Extend Frappe Gantt prototype to add custom view mode functionality
+
+
+
 export function extendGanttViewModes(Gantt: any) {
-  // Store original methods
-  const originalInitGrid = Gantt.prototype.init_grid;
-  const originalDateFromString = Gantt.prototype.date_from_string;
-
-  // Extend Gantt prototype with new view modes
-  Gantt.prototype.init_grid = function(mode: FrappeViewMode) {
-    // Add support for Minute and Hour view modes
-    if (mode === 'Minute') {
-      this.gantt_width = this.gantt_width || this.container.clientWidth;
-      this.options.step = 15; // 15-minute steps
-      this.options.column_width = 20; // Adjust column width for minute view
-      this.options.date_unit = this.minute; // Use custom minute logic
-      this.options.date_formatter = this.dateFormatter('minute');
-    } else if (mode === 'Hour') {
-      this.gantt_width = this.gantt_width || this.container.clientWidth;
-      this.options.step = 1; // 1-hour steps
-      this.options.column_width = 60; // Adjust column width for hour view
-      this.options.date_unit = this.hour;
-      this.options.date_formatter = this.dateFormatter('hour');
-    }
-  
-    // Call original method for other view modes
-    const result = originalInitGrid.call(this, mode);
-  
-    // Adjust grid rendering to use new row height
-    if (this.gantt_rows) {
-      this.gantt_rows.forEach((row: any, i: number) => {
-        const y_pos = this.options.header_height + (i * this.options.row_height);
-        row.setAttribute('y', y_pos.toString());
-        row.setAttribute('height', this.options.row_height.toString());
-      });
-  
-      // Update grid background height
-      const grid = this.gantt_container.querySelector('.grid');
-      if (grid) {
-        const backgroundRect = grid.querySelector('.grid-background');
-        if (backgroundRect) {
-          const totalGridHeight = this.options.header_height + 
-            (this.gantt_rows.length * this.options.row_height);
-          backgroundRect.setAttribute('height', totalGridHeight.toString());
-        }
-      }
-    }
-  
-    return result;
+  // Create a Minute view mode similar to other view modes
+  Gantt.VIEW_MODE.MINUTE = {
+    name: 'Minute',
+    step: '15min',  // 15-minute steps
+    column_width: 50,
+    padding: ['1d', '1d'],
+    // Add any other necessary properties matching the structure of other view modes
+    upper_text: (date: Date) => date.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    }),
+    lower_text: (date: Date) => date.toLocaleString()
   };
-  
-
-  // Custom date formatters
-  Gantt.prototype.dateFormatter = function(granularity: 'minute' | 'hour') {
-    return (date: Date, format: string) => {
-      const formatters: {[key: string]: (date: Date) => string} = {
-        minute: (date: Date) => date.toLocaleString('default', { 
-          month: 'short', 
-          day: 'numeric', 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        }),
-        hour: (date: Date) => date.toLocaleString('default', { 
-          month: 'short', 
-          day: 'numeric', 
-          hour: '2-digit' 
-        })
-      };
-      
-      return formatters[granularity](date);
-    };
-  };
-  
-
-  // Extend date parsing methods if necessary
-  Gantt.prototype.date_from_string = function(date_string: string, date_format?: string) {
-    // Add custom parsing for minute/hour views if needed
-    return originalDateFromString.call(this, date_string, date_format);
-  };
-
-  // Add minute and hour as date units
-  Gantt.prototype.minute = function(date: Date): Date {
-    const newDate = new Date(date);
-    const minutes = Math.floor(newDate.getMinutes() / 15) * 15; // Round down to nearest 15-minute mark
-    newDate.setMinutes(minutes, 0, 0);
-    return newDate;
-  };
-  
-  Gantt.prototype.hour = function(date: Date): Date {
-    const newDate = new Date(date);
-    newDate.setHours(newDate.getHours(), 0, 0, 0);
-    return newDate;
-  };
-  
 
   return Gantt;
 }
-
-
 
 
 

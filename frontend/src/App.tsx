@@ -5,6 +5,8 @@ import OrderForm from './components/OrderForm';
 import GanttView from './components/GanttView';
 import BakerView from './components/BakerView';
 import OrdersView from './components/OrdersView';
+import Gantt from 'frappe-gantt';
+
 
 type ViewMode = 'new-order' | 'manager' | 'baker1' | 'baker2' | 'orders';
 

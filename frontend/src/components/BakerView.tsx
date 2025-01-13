@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, ChefHat, ArrowRight } from 'lucide-react';
 import { bakeryApi } from '../api/bakeryApi';
-import { ScheduledTask, TaskStatus, formatDateToISO } from '../types';
+import { ScheduledTask, TaskStatus } from '../types';
 
 interface BakerViewProps {
   selectedBaker: 'Baker1' | 'Baker2';
 }
 
 const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
-  const [selectedDate, setSelectedDate] = useState(formatDateToISO(new Date()).split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toLocaleString().split('T')[0]);
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

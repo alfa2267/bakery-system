@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { bakeryApi } from '../api/bakeryApi';
 import Select, { ActionMeta, MultiValue } from 'react-select';
 
@@ -8,8 +8,11 @@ import {
   BarChart2
 } from 'lucide-react';
 import { Alert } from '../ui/Alert';
+
+
 import Gantt from 'frappe-gantt';
-import 'frappe-gantt/dist/frappe-gantt.css';
+import '../../node_modules/frappe-gantt/dist/frappe-gantt.css';
+
 
 import { 
   ScheduledTask,
@@ -24,6 +27,7 @@ import {
   isGanttTask,
   GanttChartProps
 } from '../types/index';
+import { Tooltip } from 'recharts';
 
 const GanttChart: React.FC<GanttChartProps> = ({ 
   tasks, 
@@ -35,63 +39,62 @@ const GanttChart: React.FC<GanttChartProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const ganttRef = useRef<any>(null);
-  const sidebarRef = useRef<HTMLDivElement>(null);
 
-  const transformToGanttTasks = (tasks: ScheduledTask[]): GanttTask[] => {
-  // If no tasks, create placeholder tasks for each production step
-  if (tasks.length === 0) {
-    return PRODUCTION_STEPS
-      .filter(step => filteredSteps.has(step))
-      .map(step => ({
-        id: `placeholder-${step}`,
-        name: `Placeholder ${step}`,
-        start: new Date().toISOString(),
-        end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours later
-        progress: 0,
-        dependencies: '',
-        custom_class: `step-${step}`,
-        _data: { 
-          originalTask: {
-            id: `placeholder-${step}`,
-            orderId: 'placeholder',
-            step,
-            startTime: new Date(),
-            endTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
-            resources: [],
-            batchSize: 0,
-            dependencies: '',
-            status: 'pending'
-          } 
-        }
-      }));
-  }
+  const transformToGanttTasks = useCallback((tasks: ScheduledTask[]): GanttTask[] => {
+    // If no tasks, create placeholder tasks for each production step
+    if (tasks.length === 0) {
+      return PRODUCTION_STEPS
+        .filter(step => filteredSteps.has(step))
+        .map(step => ({
+          id: `placeholder-${step}`,
+          name: `Placeholder ${step}`,
+          start: new Date().toISOString(),
+          end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours later
+          progress: 0,
+          dependencies: '',
+          custom_class: `step-${step}`,
+          _data: { 
+            originalTask: {
+              id: `placeholder-${step}`,
+              orderId: 'placeholder',
+              step,
+              startTime: new Date(),
+              endTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
+              resources: [],
+              batchSize: 0,
+              dependencies: '',
+              status: 'pending'
+            } 
+          }
+        }));
+    }
 
-  // Existing transformation logic
-  return tasks
-    .filter(task => filteredSteps.has(task.step))
-    .map(task => {
-      const startTime = task.startTime instanceof Date 
-        ? task.startTime 
-        : new Date(task.startTime);
-      const endTime = task.endTime instanceof Date 
-        ? task.endTime 
-        : new Date(task.endTime);
+    // Existing transformation logic
+    return tasks
+      .filter(task => filteredSteps.has(task.step))
+      .map(task => {
+        const startTime = task.startTime instanceof Date 
+          ? task.startTime 
+          : new Date(task.startTime);
+        const endTime = task.endTime instanceof Date 
+          ? task.endTime 
+          : new Date(task.endTime);
 
-      const ganttTask: GanttTask = {
-        id: task.orderId + '-' + task.step,
-        name: `${task.product?.name || 'Unnamed'} (${task.batchSize})`,
-        start: startTime.toISOString(),
-        end: endTime.toISOString(),
-        progress: task.status === 'completed' ? 100 : 
-                 task.status === 'in-progress' ? 50 : 0,
-        dependencies: Array.isArray(task.dependencies) ? task.dependencies.join(',') : '',
-        custom_class: `step-${task.step}`,
-        _data: { originalTask: task }
-      };
+        const ganttTask: GanttTask = {
+          id: task.orderId + '-' + task.step,
+          name: `${task.product?.name || 'Unnamed'} (${task.batchSize})`,
+          start: startTime.toISOString(),
+          end: endTime.toISOString(),
+          progress: task.status === 'completed' ? 100 : 
+                   task.status === 'in-progress' ? 50 : 0,
+          dependencies: Array.isArray(task.dependencies) ? task.dependencies.join(',') : '',
+          custom_class: `step-${task.step}`,
+          _data: { originalTask: task }
+        };
 
-      return ganttTask;
-    });
-};
+        return ganttTask;
+      });
+  }, [filteredSteps]);
 
   useEffect(() => {
     if (!containerRef.current || tasks.length === 0) return;
@@ -138,31 +141,54 @@ const GanttChart: React.FC<GanttChartProps> = ({
 
     const ganttTasks = transformToGanttTasks(tasks);
 
+    /* 
+
+
+               <p>Progress: ${task.progress}% </p>
+               <p>Start: ${new Date(task.start).toLocaleString()}</p>
+               <p>End: ${new Date(task.end).toLocaleString()}</p>
+                 <p>Batch Size: ${task._data.originalTask?.batchSize}</p>
+               <p>Dependencies: ${task._data.originalTask?.dependencies || 'None'}</p> 
+
+               */
+
     try {
-      console.log('Gantt Tasks:', ganttTasks);
 
       ganttRef.current = new ExtendedGantt(ganttContainer, ganttTasks, {
-        view_modes: ['Minute','Hour','Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
+        view_modes: [
+          Gantt.VIEW_MODE.MINUTE,
+          Gantt.VIEW_MODE.HOUR,
+          Gantt.VIEW_MODE.QUARTER_DAY,
+          Gantt.VIEW_MODE.HALF_DAY,
+          Gantt.VIEW_MODE.DAY,
+          Gantt.VIEW_MODE.WEEK,
+          Gantt.VIEW_MODE.MONTH
+        ],
         view_mode: viewMode,
         date_format: 'YYYY-MM-DD HH:mm:ss',
         row_height: GANTT_CONFIG.rowHeight,
         bar_height: GANTT_CONFIG.rowHeight - 18, // Adjust bar height to fit the 60px row
-      
-        custom_popup_html: (task: BaseTask) => {
-          if (!isGanttTask(task)) return '';
-          const originalTask = task._data.originalTask;
-          return `
-            <div class="details-container bg-white p-4 rounded shadow-lg border">
-              <h5 class="font-bold mb-2">${originalTask.product?.name || 'Unnamed'}</h5>
-              <p>Status: ${originalTask.status || 'Pending'}</p>
-              <p>Progress: ${task.progress}%</p>
-              <p>Start: ${new Date(task.start).toLocaleString()}</p>
-              <p>End: ${new Date(task.end).toLocaleString()}</p>
-              <p>Batch Size: ${originalTask.batchSize}</p>
-              <p>Dependencies: ${originalTask.dependencies || 'None'}</p>
-            </div>
-          `;
-        },
+        start: (task: BaseTask) => { return task.start; },
+        end: (task: BaseTask) => { return task.end; },
+        popup: (task: any) => {
+
+           task = task.task;
+           const tod = task._data.originalTask;
+          
+           return `
+             <div class="details-container bg-yellow p-4 rounded shadow-lg border">
+               <h5 class="font-bold mb-2"> ${task.name }</h5>
+              <p>Status: ${tod.status || 'Pending'}</p>
+              <p>Progress: ${task.progress}% </p>
+               <p>Start: ${new Date(task.start).toLocaleString()}</p>
+               <p>End: ${new Date(task.end).toLocaleString()}</p>
+                 <p>Batch Size: ${tod.batchSize}</p>
+               <p>Dependencies: ${tod.dependencies || 'None'}</p> 
+
+             </div>
+           `;
+         },
+         popup_on: 'click',
 
         on_click: (task: BaseTask) => {
           if (!isGanttTask(task)) return;
@@ -181,6 +207,8 @@ const GanttChart: React.FC<GanttChartProps> = ({
           }
         }
       });
+
+
     } catch (error) {
       console.error('Error creating Gantt chart:', error);
     }
@@ -244,13 +272,14 @@ const GanttChart: React.FC<GanttChartProps> = ({
       });
     }
 
+    const currentContainer = containerRef.current;
     return () => {
       style.remove();
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
+      if (currentContainer) {
+        currentContainer.innerHTML = '';
       }
     };
-  }, [tasks, viewMode, filteredSteps, onDateChange, onProgressChange]);
+  }, [tasks, viewMode, filteredSteps, onDateChange, onProgressChange, transformToGanttTasks]);
 
   useEffect(() => {
     if (ganttRef.current) {
@@ -288,8 +317,6 @@ const GanttView: React.FC = () => {
     );
     setFilteredSteps(selectedSteps);
   };
-  
-
 
   useEffect(() => {
     const fetchSchedule = async () => {
@@ -340,17 +367,7 @@ const GanttView: React.FC = () => {
     }
   };
 
-  const toggleStep = (step: string) => {
-    setFilteredSteps(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(step)) {
-        newSet.delete(step);
-      } else {
-        newSet.add(step);
-      }
-      return newSet;
-    });
-  };
+  // Removed the unused toggleStep function
 
   if (isLoading) {
     return (
@@ -367,7 +384,6 @@ const GanttView: React.FC = () => {
       </Alert>
     );
   }
-
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
