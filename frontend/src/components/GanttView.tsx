@@ -137,7 +137,31 @@ const GanttChart: React.FC<ExtendedGanttChartProps> = ({
     sidebar.className = 'sticky left-0 z-10 w-48 bg-white border-r shadow-sm overflow-hidden';
     
     const sidebarHeader = document.createElement('div');
-    sidebarHeader.style.height = '88px'; // Matches combined height of upper and lower headers
+    // Initial setup of the sidebar header
+    sidebarHeader.className = `border-b flex items-center justify-center px-4 font-medium text-gray-700 bg-gray-50`;
+
+    // Create a MutationObserver to watch for the Gantt chart rendering
+    const observer = new MutationObserver((mutations, obs) => {
+      const upperHeader = document.querySelector('.upper-header');
+      const lowerHeader = document.querySelector('.lower-header');
+      
+      if (upperHeader && lowerHeader) {
+        const upperHeight = upperHeader.getBoundingClientRect().height;
+        const lowerHeight = lowerHeader.getBoundingClientRect().height;
+        const totalHeight = upperHeight + lowerHeight;
+        
+        sidebarHeader.style.height = `${totalHeight}px`;
+        obs.disconnect(); // Stop observing once we've set the height
+      }
+    });
+
+    const ganttContainer = document.createElement('div');
+
+    // Start observing the container for changes
+    observer.observe(ganttContainer, {
+      childList: true,
+      subtree: true
+    });;
     sidebarHeader.className = `border-b flex items-center justify-center px-4 font-medium text-gray-700 bg-gray-50`;
     sidebarHeader.textContent = groupingMode === 'product' ? 'Products' : 'Process Steps';
     sidebar.appendChild(sidebarHeader);
@@ -173,7 +197,6 @@ const GanttChart: React.FC<ExtendedGanttChartProps> = ({
     sidebar.appendChild(sidebarContent);
     wrapper.appendChild(sidebar);
 
-    const ganttContainer = document.createElement('div');
     ganttContainer.className = 'gantt-container flex-1 overflow-x-auto';
     wrapper.appendChild(ganttContainer);
 
@@ -238,8 +261,12 @@ const GanttChart: React.FC<ExtendedGanttChartProps> = ({
 
     const style = document.createElement('style');
     style.textContent = `
+      .gantt-wrapper {
+        height: 100%;
+        position: relative;
+      }
       .gantt-wrapper .sidebar-content {
-        max-height: calc(100vh - 16rem);
+        height: calc(100% - ${GANTT_CONFIG.headerHeight}px);
         overflow-y: auto;
       }
       .gantt .grid-header {
@@ -263,6 +290,16 @@ const GanttChart: React.FC<ExtendedGanttChartProps> = ({
         fill: white;
         font-size: 12px;
         font-weight: 500;
+      }
+      .gantt-container {
+        height: 100%;
+        overflow: auto;
+      }
+      .timeline-body {
+        overflow-x: auto !important;
+      }
+      .grid-body {
+        overflow-x: hidden !important;
       }
       .details-container {
         background: white;
@@ -327,7 +364,7 @@ const GanttChart: React.FC<ExtendedGanttChartProps> = ({
   }, [viewMode]);
 
   return (
-    <div ref={containerRef} className="h-full w-full">
+    <div ref={containerRef} className="h-full w-full relative">
       {/* Frappe Gantt will be initialized here */}
     </div>
   );
@@ -432,7 +469,7 @@ const GanttView: React.FC = () => {
         <div className="px-4 flex justify-between items-center mb-3">
           {/* View Mode Selector */}
           <div className="flex bg-gray-100 rounded-lg p-0.5">
-            {(['Day', 'Week', 'Month', 'Quarter Day', 'Half Day'] as FrappeViewMode[]).map((mode) => (
+            {(['Hour', 'Day', 'Week', 'Month', 'Quarter Day', 'Half Day'] as FrappeViewMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setCurrentView(mode)}
@@ -532,6 +569,10 @@ const GanttView: React.FC = () => {
                   ...base,
                   minHeight: '32px',
                 }),
+                menu: (base) => ({
+                  ...base,
+                  zIndex: 50
+                }),
                 option: (base, { data, isSelected }) => {
                   const stepColor = STEP_COLORS[data.value].replace('bg-', '');
                   const colorMap: Record<string, string> = {
@@ -629,8 +670,8 @@ const GanttView: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full">
+      <div className="flex-1 overflow-hidden relative">
+        <div className="absolute inset-0">
           <GanttChart
             tasks={schedule}
             viewMode={currentView}
