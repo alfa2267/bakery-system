@@ -198,6 +198,74 @@ async def get_orders(db: Session = Depends(get_db)):
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching the orders")
 
+@app.get("/schedule")
+async def get_schedules(
+    include_details: bool = Query(False, description="Include order details with tasks"),
+    db: Session = Depends(get_db)
+):
+    try:
+      
+        logger.info(f"Fetching all schedules")
+        repository = OrderRepository(db)
+        
+        try:
+            # Fetch tasks for the date
+            db_tasks = repository.get_tasks()
+            
+            # Convert DB tasks to ScheduleResponse tasks
+            tasks = [
+                ScheduledTask(
+                    orderId=task.order_id,
+                    step=task.step,
+                    startTime=task.start_time,
+                    endTime=task.end_time,
+                    resources=task.resources,
+                    batchSize=task.batch_size,
+                    status=task.status or 'pending',
+                    product=Product(
+                    id=task.order_item.product.id,
+                    name=task.order_item.product.name
+                ) if task.order_item and task.order_item.product else None
+            
+                )
+                for task in db_tasks
+            ]
+            
+            # Prepare response
+            response_data = {"schedule": tasks}
+            
+            if include_details and tasks:
+                # Calculate resource utilization
+                resource_util = _calculate_resource_utilization(tasks)
+                
+                summary = DailyScheduleSummary(
+                    date= "01/01/2025",
+                    total_orders=len(set(task.orderId for task in tasks)),
+                    total_tasks=len(tasks),
+                    resource_utilization=resource_util,
+                    start_time=min(task.startTime for task in tasks),
+                    end_time=max(task.endTime for task in tasks)
+                )
+                response_data["summary"] = summary
+            
+            return response_data
+        
+        except SQLAlchemyError as db_error:
+            logger.error(f"Database error fetching schedule: {str(db_error)}")
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=500, detail=f"Database error: {str(db_error)}")
+    
+    except HTTPException:
+        raise
+    except Exception as unexpected_error:
+        logger.error(f"Unexpected error fetching schedule: {str(unexpected_error)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching the schedule")
+
+
+
+
+
 @app.get("/schedule/{date}")
 async def get_schedule(
     date: str, 
@@ -268,6 +336,15 @@ async def get_schedule(
         logger.error(f"Unexpected error fetching schedule: {str(unexpected_error)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="An unexpected error occurred while fetching the schedule")
+
+
+
+
+
+
+
+
+
 
 def _calculate_resource_utilization(tasks: List[ScheduledTask]) -> List[ResourceUtilization]:
     """Calculate resource utilization based on scheduled tasks"""

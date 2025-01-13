@@ -141,8 +141,23 @@ export const bakeryApi = {
     return result.orders;
   },
 
+  getSchedules: async ( includeDetails: boolean = false): Promise<ScheduleResponse> => {
+    
+    const url = new URL(`${API_BASE_URL}/schedule`);
+
+
+    if (includeDetails) url.searchParams.append('include_details', 'true');
+    const response = await fetch(url.toString());
+    return handleResponse<ScheduleResponse>(response);
+  },
+
+
   getSchedule: async (date: string, includeDetails: boolean = false): Promise<ScheduleResponse> => {
-    const url = new URL(`${API_BASE_URL}/schedule/${date}`);
+    
+
+   const url  = new URL(`${API_BASE_URL}/schedule/${date}`) ;
+
+
     if (includeDetails) url.searchParams.append('include_details', 'true');
     const response = await fetch(url.toString());
     return handleResponse<ScheduleResponse>(response);

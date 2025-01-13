@@ -191,6 +191,30 @@ class OrderRepository:
         
         return orders
 
+
+
+    def get_tasks(self) -> List[models.ScheduledTaskDB]:
+        """Fetch all tasks"""
+        logger.info("Fetching all tasks")
+        tasks = self.db.query(models.ScheduledTaskDB)\
+            .join(models.OrderDB)\
+            .options(
+                joinedload(models.ScheduledTaskDB.order_item)\
+                .joinedload(models.OrderItemDB.product)
+            )\
+            .all()
+
+        if not tasks:
+            logger.warning("No tasks found")
+        
+        return tasks
+
+
+
+
+
+
+
     def get_tasks_by_date(self, date: str) -> List[models.ScheduledTaskDB]:
         """Fetch all tasks for a specific delivery date"""
         logger.info("Fetching tasks for date: %s", date)
@@ -207,6 +231,8 @@ class OrderRepository:
             logger.warning("No tasks found for date: %s", date)
         
         return tasks
+
+
 
     def get_tasks_by_date_and_resource(
         self, 

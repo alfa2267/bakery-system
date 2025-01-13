@@ -148,13 +148,14 @@ const GanttChart: React.FC<ExtendedGanttChartProps> = ({
       if (upperHeader && lowerHeader) {
         const upperHeight = upperHeader.getBoundingClientRect().height;
         const lowerHeight = lowerHeader.getBoundingClientRect().height;
-        const totalHeight = upperHeight + lowerHeight;
+        const gridHeader = document.querySelector('.grid-header');
+        const gridHeaderHeight = gridHeader ? gridHeader.getBoundingClientRect().height : 0;
         
+        const totalHeight = Math.max(upperHeight + lowerHeight, gridHeaderHeight);
         sidebarHeader.style.height = `${totalHeight}px`;
         obs.disconnect(); // Stop observing once we've set the height
       }
     });
-
     const ganttContainer = document.createElement('div');
 
     // Start observing the container for changes
@@ -396,12 +397,15 @@ const GanttView: React.FC = () => {
     setFilteredSteps(selectedSteps);
   };
 
+  // Load schedule only on mount
   useEffect(() => {
     const fetchSchedule = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        const response = await bakeryApi.getSchedule(selectedDate, true);
+        const response = await bakeryApi.getSchedules(
+         // new Date().toISOString().split('T')[0],
+           true);
         if (response && response.schedule) {
           setSchedule(response.schedule);
           if (response.summary) {
@@ -416,7 +420,7 @@ const GanttView: React.FC = () => {
     };
 
     fetchSchedule();
-  }, [selectedDate]);
+  }, []); // Only on mount
 
   const handleDateChange = async (task: ScheduledTask, start: Date, end: Date) => {
     try {
@@ -518,7 +522,7 @@ const GanttView: React.FC = () => {
               onClick={() => {
                 const date = new Date(selectedDate);
                 date.setDate(date.getDate() - 1);
-                setSelectedDate(date.toISOString().split('T')[0]);
+               // setSelectedDate(date.toISOString().split('T')[0]);
               }}
               className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
             >
@@ -528,7 +532,13 @@ const GanttView: React.FC = () => {
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  const selectedElement = document.querySelector(`.date_${e.target.value.replace(/-/g, '-')}`);
+                  if (selectedElement) {
+                    selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                  }
+                }}
                 className="px-3 py-1.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
               />
               <span className="text-xs text-gray-500 mt-0.5">
@@ -544,7 +554,7 @@ const GanttView: React.FC = () => {
               onClick={() => {
                 const date = new Date(selectedDate);
                 date.setDate(date.getDate() + 1);
-                setSelectedDate(date.toISOString().split('T')[0]);
+                //setSelectedDate(date.toISOString().split('T')[0]);
               }}
               className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
             >
@@ -565,13 +575,22 @@ const GanttView: React.FC = () => {
               placeholder="Filter steps..."
               isSearchable={false}
                             styles={{
+                container: (base) => ({
+                  ...base,
+                  zIndex: 999
+                }),
                 control: (base) => ({
                   ...base,
                   minHeight: '32px',
+                  zIndex: 999
                 }),
                 menu: (base) => ({
                   ...base,
-                  zIndex: 50
+                  zIndex: 999
+                }),
+                menuPortal: (base) => ({
+                  ...base,
+                  zIndex: 999
                 }),
                 option: (base, { data, isSelected }) => {
                   const stepColor = STEP_COLORS[data.value].replace('bg-', '');
