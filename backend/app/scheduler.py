@@ -1,246 +1,429 @@
-import json
-import logging
+import numpy as np
+from typing import List, Dict, Set, Tuple, Optional
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import List, Tuple, Dict
-from pathlib import Path
-from .models import Order, Recipe, ProductionStep, ScheduledTask
+import heapq
+import random
+from collections import defaultdict
+import math
+import bisect
 
-# Set up logging configuration
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
+# Constants for optimization
+MAX_GENERATIONS = 100
+POPULATION_SIZE = 5  # μ-GA uses small population
+CROSSOVER_RATE = 1.0  # μ-GA uses 100% crossover 
+MUTATION_RATE = 0.0   # μ-GA omits mutation
+CONVERGENCE_THRESHOLD = 0.05  # 5% convergence threshold
 
-class BakeryScheduler:
-    def __init__(self, recipes_path: str = None):
-        self.recipes_path = recipes_path or Path(__file__).parent / 'recipes.json'
-        self.recipes = self._load_recipes()
-        self.orders = []
-        self.schedule = []
+@dataclass
+class ScheduledTask:
+    orderId: str 
+    step: str
+    startTime: datetime
+    endTime: datetime
+    resources: List[str]
+    batchSize: int
+    status: str = 'pending'
 
-    def _load_recipes(self) -> Dict[str, Recipe]:
-        """Load recipes from JSON file"""
-        try:
-            logger.info(f"Loading recipes from {self.recipes_path}")
-            with open(self.recipes_path, 'r') as f:
-                recipe_data = json.load(f)
-            logger.info("Recipes loaded successfully")
-        except FileNotFoundError:
-            logger.error(f"Recipe file not found at {self.recipes_path}")
-            raise FileNotFoundError(f"Recipe file not found at {self.recipes_path}")
-        except json.JSONDecodeError:
-            logger.error("Invalid JSON format in recipe file")
-            raise ValueError("Invalid JSON format in recipe file")
+    @property
+    def duration(self) -> int:
+        return int((self.endTime - self.startTime).total_seconds() / 60)
 
-        recipes = {}
-        for product_type, recipe_info in recipe_data.items():
-            # Convert JSON steps to ProductionStep objects
-            try:
-                steps = [
-                    ProductionStep(
-                        name=step['name'],
-                        duration=step['duration'],
-                        requiresHuman=step['requiresHuman'],
-                        requiresOven=step['requiresOven'],
-                        requiresMixer=step['requiresMixer'],
-                        mustFollowImmediately=step['mustFollowImmediately'],
-                        scalingFactor=step.get('scalingFactor', 1.0)
-                    )
-                    for step in recipe_info['steps']
-                ]
-            except KeyError as e:
-                logger.error(f"Missing required key {e} in recipe for {product_type}")
-                raise
+@dataclass
+class OptimizationState:
+    """Tracks the state of optimization across generations"""
+    best_fitness: float = float('-inf')
+    generations_without_improvement: int = 0
+    convergence_count: int = 0
+    elite_solution: Optional[List[ScheduledTask]] = None
 
-            # Create Recipe object
-            recipes[product_type] = Recipe(
-                productType=recipe_info['productType'],
-                steps=steps,
-                requiresChilling=recipe_info['requiresChilling'],
-                maxChillTime=recipe_info['maxChillTime'],
-                minBatchSize=recipe_info['minBatchSize'],
-                maxBatchSize=recipe_info['maxBatchSize']
-            )
+@dataclass
+class SchedulerArea:
+    """Scheduler area to group resources and requirements"""
+    name: str 
+    warehouse_id: str
+    location_id: str
+    active: bool = True
+    calendar_id: Optional[str] = None
 
-        return recipes
+@dataclass  
+class SupplyInfo:
+    """Supply information for scheduling"""
+    supplier_id: str
+    lead_time: float = 0.0
+    min_qty: float = 0.0
+    max_qty: float = 0.0
+    qty_multiple: float = 1.0
+    supply_method: str = "buy"  # buy, manufacture, pull, push
+    supply_delay: int = 0
 
-   
+class EnhancedBakeryScheduler(BakeryScheduler):
+    """Enhanced scheduler with MRP concepts"""
 
-# In scheduler.py
-
-    def validate_order(self, order: Order) -> Tuple[bool, List[str]]:
-        warnings = []
-        is_valid = True
-
-        if not order.items:
-            logger.warning(f"Order {order.id} has no items")
-            is_valid = False
-            warnings.append("Order has no items")
-
-        # Check delivery date - Change from deliveryDate to delivery_date
-        try:
-            delivery_date = datetime.strptime(order.delivery_date, "%Y-%m-%d").date()
-            if delivery_date < datetime.now().date():
-                logger.warning(f"Order {order.id} has an invalid delivery date: {order.delivery_date}")
-                is_valid = False
-                warnings.append("Delivery date must be in the future")
-        except ValueError:
-            logger.error(f"Invalid delivery date format for order {order.id}: {order.delivery_date}")
-            is_valid = False
-            warnings.append("Invalid delivery date format")
-
-        # Validate each item
-        for item in order.items:
-            recipe = self.recipes.get(item.product)
-            if not recipe:
-                logger.error(f"Unknown product {item.product} in order {order.id}")
-                is_valid = False
-                warnings.append(f"Unknown product: {item.product}. Available products: {', '.join(self.recipes.keys())}")
-                continue
-
-            # Check batch size constraints
-            if item.quantity < recipe.minBatchSize:
-                logger.warning(f"Order {order.id}: Item {item.product} has a quantity lower than minimum batch size")
-                warnings.append(
-                    f"Minimum batch size for {item.product} is {recipe.minBatchSize}. "
-                    f"Order will be rounded up."
-                )
-
-            # Calculate number of batches needed
-            batches = (item.quantity + recipe.maxBatchSize - 1) // recipe.maxBatchSize
-            if batches > 1:
-                logger.info(f"Order {order.id}: Item {item.product} requires {batches} batches")
-                warnings.append(
-                    f"Order requires {batches} batches of {item.product}"
-                )
-
-        return is_valid, warnings
-
-
-
-    def get_available_products(self) -> List[Dict]:
-        """Return list of available products and their constraints"""
-        available_products = [
-            {
-                "product": product_type,
-                "minBatchSize": recipe.minBatchSize,
-                "maxBatchSize": recipe.maxBatchSize,
-                "requiresChilling": recipe.requiresChilling,
-                "totalProductionTime": sum(step.duration for step in recipe.steps)
-            }
-            for product_type, recipe in self.recipes.items()
-        ]
-        logger.info(f"Available products: {', '.join([prod['product'] for prod in available_products])}")
-        return available_products
-
-    def schedule_order(self, order: Order) -> List[ScheduledTask]:
-        if not order.items:
-            logger.error(f"Cannot schedule order {order.id}: No items found.")
-            raise ValueError("Cannot schedule order: No items found.")
-            
-        tasks = []
-        delivery_time = datetime.strptime(f"{order.delivery_date} {order.delivery_slot.split('-')[0]}", "%Y-%m-%d %H:%M")
-
-        for item in order.items:
-            recipe = self.recipes.get(item.product)
-            if not recipe:
-                logger.error(f"Unknown recipe for product {item.product} in order {order.id}")
-                raise ValueError(f"Unknown recipe for product: {item.product}")
-            
-            batches = self._calculate_batches(item.quantity, recipe)
-            
-            batch_tasks = self._schedule_batches(
-                batches,
-                recipe,
-                delivery_time,
-                order.id
-            )
-            tasks.extend(batch_tasks)
-
-        logger.info(f"Order {order.id} scheduled with {len(tasks)} tasks")
-        return tasks
-
-
-
-
-    def _calculate_batches(self, quantity: int, recipe: Recipe) -> List[int]:
-        """Calculate optimal batch sizes"""
-        batches = []
-        remaining = quantity
+    def __init__(self, recipes: List[Recipe], max_look_ahead_days: int = 7):
+        super().__init__(recipes, max_look_ahead_days)
         
-        while remaining > 0:
-            if remaining > recipe.maxBatchSize:
-                batches.append(recipe.maxBatchSize)
-                remaining -= recipe.maxBatchSize
-            else:
-                if remaining < recipe.minBatchSize:
-                    batches.append(recipe.minBatchSize)
-                    remaining = 0
-                else:
-                    batches.append(remaining)
-                    remaining = 0
-                    
-        logger.debug(f"Batches calculated: {batches}")
-        return batches
+        # MRP Parameters
+        self.areas: Dict[str, SchedulerArea] = {}
+        self.supply_info: Dict[str, SupplyInfo] = {}
+        self.inventory_levels: Dict[str, float] = defaultdict(float)
+        self.safety_stocks: Dict[str, float] = defaultdict(float)
+        self.lead_times: Dict[str, int] = defaultdict(int)
+        
+        # Parent/Child dependencies for multi-level planning
+        self.bom_relations = defaultdict(list)  # parent -> [children]
+        self.llc = defaultdict(int)  # item -> low level code
+    def __init__(self, recipes: List[Recipe], max_look_ahead_days: int = 7):
+        self.recipes = {r.productType: r for r in recipes}
+        self.max_look_ahead_days = max_look_ahead_days
+        self.resource_cache = defaultdict(set)
+        
+        # Optimization parameters
+        self.population_size = 128
+        self.max_iterations = 50
+        self.mutation_rate = 0.2
+        self.crossover_rate = 0.8
+        self.local_search_iters = 20
+        
+        # Caching and memory management
+        self._setup_caches()
+        
+    def _setup_caches(self):
+        """Initialize optimization caches"""
+        self.dependency_cache = {}
+        self.resource_usage_cache = defaultdict(dict)
+        self.batch_size_cache = {}
+        self.critical_path_cache = {}
+        
+    def _initialize_population(self, orders: List[Order], recipe: Recipe) -> List[List[ScheduledTask]]:
+        """Initialize population using heuristic-based generation"""
+        population = []
+        for _ in range(POPULATION_SIZE):
+            # Generate schedule with randomized priorities but guided by heuristics
+            schedule = self._generate_heuristic_schedule(orders, recipe)
+            population.append(schedule)
+        return population
 
-    def _get_required_resources(self, step: ProductionStep) -> List[str]:
-        resources = []
-        if step.requiresHuman:
-            resources.append("baker")
-        if step.requiresOven:
-            resources.append("oven")
-        if step.requiresMixer:
-            resources.append("mixer")
-        return resources
-
-    def _schedule_batches(
-        self,
-        batches: List[int],
-        recipe: Recipe,
-        delivery_time: datetime,
-        order_id: str
-    ) -> List[ScheduledTask]:
+    def _generate_heuristic_schedule(self, orders: List[Order], recipe: Recipe) -> List[ScheduledTask]:
+        """Generate a single schedule using priority-based heuristics"""
         tasks = []
-        current_time = delivery_time
-
-        # Schedule backwards from delivery time
-        for batch_size in batches:
-            batch_tasks = []
-
-            # Go through steps in reverse
-            for step in reversed(recipe.steps):
-                end_time = current_time
-                start_time = end_time - timedelta(minutes=step.duration)
+        resource_timeline = defaultdict(list)  # Track resource usage intervals
+        
+        # Sort orders by due date and priority
+        sorted_orders = sorted(orders, key=lambda o: (o.delivery_date, o.delivery_slot))
+        
+        for order in sorted_orders:
+            # Calculate earliest possible start times considering dependencies
+            start_times = self._calculate_earliest_starts(order, recipe, resource_timeline)
+            
+            # Schedule each step of the recipe
+            for step_idx, step in enumerate(recipe.steps):
+                # Find available time slot
+                start_time = self._find_next_available_slot(
+                    start_times[step_idx],
+                    step.duration,
+                    step.resources,
+                    resource_timeline
+                )
                 
                 task = ScheduledTask(
-                    orderId=order_id,
+                    orderId=order.id,
                     step=step.name,
                     startTime=start_time,
-                    endTime=end_time,
-                    resources=self._get_required_resources(step),
-                    batchSize=batch_size
+                    endTime=start_time + timedelta(minutes=step.duration),
+                    resources=step.resources,
+                    batchSize=order.items[0].quantity,  # Simplified for example
+                    status='pending'
                 )
-                batch_tasks.append(task)
-
-                if step.mustFollowImmediately and len(recipe.steps) > 1:
-                    current_time = start_time
-                else:
-                    # Allow for flexible timing if not immediate
-                    current_time = self._find_available_time(
-                        start_time,
-                        step,
-                        batch_size
-                    )
-
-            tasks.extend(reversed(batch_tasks))
-
-        logger.debug(f"Scheduled {len(tasks)} tasks for order {order_id}")
+                
+                # Update resource timeline
+                for resource in step.resources:
+                    bisect.insort(resource_timeline[resource], (start_time, task.endTime))
+                
+                tasks.append(task)
+                
         return tasks
 
-    def _find_available_time(
-        self,
-        desired_time: datetime,
-        step: ProductionStep,
-        batch_size: int
-    ) -> datetime:
-        # For simplicity, let's assume resources are always available.
-        # You can add real resource conflict checking here.
-        return desired_time
+    @dataclass
+class PartialOrderInfo:
+    """Tracks partial ordering information between tasks"""
+    before: Set[str] = field(default_factory=set)  # Tasks that must come before 
+    after: Set[str] = field(default_factory=set)   # Tasks that must come after
+    concurrent: Set[str] = field(default_factory=set)  # Tasks that can run concurrently
+
+class BakeryScheduler:
+    def _check_dependencies(self, task1: ScheduledTask, task2: ScheduledTask) -> bool:
+        """Check if two tasks have dependencies requiring ordering"""
+        # Resource conflicts require ordering
+        if set(task1.resources) & set(task2.resources):
+            return True
+            
+        # Same order dependencies require ordering
+        if task1.orderId == task2.orderId:
+            return True
+            
+        # Recipe-specific dependencies require ordering 
+        recipe = self.recipes.get(task1.step.split('_')[0])
+        if recipe and recipe.steps:
+            task1_idx = next((i for i,s in enumerate(recipe.steps) if s.name == task1.step), -1)
+            task2_idx = next((i for i,s in enumerate(recipe.steps) if s.name == task2.step), -1)
+            if task1_idx >= 0 and task2_idx >= 0 and task1_idx < task2_idx:
+                return True
+                
+        return False
+
+    def _build_partial_order(self, tasks: List[ScheduledTask]) -> Dict[str, PartialOrderInfo]:
+        """Build partial order relations between tasks"""
+        order_info = defaultdict(PartialOrderInfo)
+        
+        for i, task1 in enumerate(tasks):
+            for task2 in tasks[i+1:]:
+                if self._check_dependencies(task1, task2):
+                    # Add ordering constraints
+                    order_info[task1.orderId].after.add(task2.orderId)
+                    order_info[task2.orderId].before.add(task1.orderId)
+                else:
+                    # Tasks can run concurrently
+                    order_info[task1.orderId].concurrent.add(task2.orderId)
+                    order_info[task2.orderId].concurrent.add(task1.orderId)
+                    
+        return order_info
+
+    def compute_low_level_codes(self):
+        """Compute low level codes for multi-level planning"""
+        processed = set()
+        llc = 0
+        while len(processed) < len(self.bom_relations):
+            level_items = []
+            for item, children in self.bom_relations.items():
+                if item not in processed and all(c in processed for c in children):
+                    level_items.append(item)
+            for item in level_items:
+                self.llc[item] = llc
+                processed.add(item)
+            llc += 1
+            
+    def adjust_order_quantity(self, product: str, qty: float) -> float:
+        """Adjust order quantity based on min/max/multiple rules"""
+        if product not in self.supply_info:
+            return qty
+            
+        supply = self.supply_info[product]
+        if qty < supply.min_qty:
+            return supply.min_qty
+            
+        if supply.qty_multiple > 1:
+            qty = math.ceil(qty / supply.qty_multiple) * supply.qty_multiple
+            
+        if supply.max_qty > 0:
+            qty = min(qty, supply.max_qty)
+            
+        return qty
+
+    def get_action_date(self, product: str, need_date: datetime) -> datetime:
+        """Calculate action date considering lead times"""
+        if product not in self.lead_times:
+            return need_date
+            
+        calendar = self.areas[product].calendar_id if product in self.areas else None
+        lead_time = self.lead_times[product]
+        
+        if calendar and lead_time:
+            return calendar.plan_days(-lead_time, need_date)
+        else:
+            return need_date - timedelta(days=lead_time)
+        """Calculate equitable threat score with numpy vectorization"""
+        if not self._is_feasible(schedule):
+            return float('-inf')
+            
+        thresholds = np.array([10, 20, 30, 40, 50, 60])
+        durations = np.array([task.duration for task in schedule])
+        optimal_timings = np.array([self._is_optimal_timing(task) for task in schedule])
+        
+        total_ets = 0
+        for threshold in thresholds:
+            pred_pos = durations >= threshold
+            true_pos = optimal_timings
+            
+            hits = np.sum(pred_pos & true_pos)
+            misses = np.sum(~pred_pos & true_pos) 
+            false_alarms = np.sum(pred_pos & ~true_pos)
+            
+            # Calculate ETS score
+            total = len(schedule)
+            chance = ((hits + misses) * (hits + false_alarms)) / total
+            if hits + misses + false_alarms - chance > 0:
+                ets = (hits - chance) / (hits + misses + false_alarms - chance)
+                total_ets += ets
+                
+        return total_ets / len(thresholds)
+
+    def _identify_critical_path(self, tasks: List[ScheduledTask]) -> List[ScheduledTask]:
+        """Identifies critical path using improved dynamic programming approach"""
+        # Check cache first
+        cache_key = tuple((t.orderId, t.startTime, t.endTime) for t in sorted(tasks, key=lambda x: x.startTime))
+        if cache_key in self.critical_path_cache:
+            return self.critical_path_cache[cache_key]
+            
+        # Build dependency graph using numpy for efficiency
+        n = len(tasks)
+        dep_matrix = np.zeros((n, n), dtype=bool)
+        task_indices = {task: i for i, task in enumerate(tasks)}
+        
+        for i, task1 in enumerate(tasks):
+            for j, task2 in enumerate(tasks[i+1:], i+1):
+                if task2.startTime >= task1.endTime and (
+                    task2.orderId == task1.orderId or 
+                    set(task2.resources) & set(task1.resources)
+                ):
+                    dep_matrix[i,j] = True
+                    
+        # Find longest path using vectorized operations
+        distances = np.zeros(n)
+        for i in reversed(range(n)):
+            successors = np.where(dep_matrix[i])[0]
+            if len(successors) > 0:
+                distances[i] = tasks[i].duration + np.max(distances[successors])
+            else:
+                distances[i] = tasks[i].duration
+                
+        # Reconstruct critical path
+        critical_path = []
+        curr_idx = np.argmax(distances)
+        while curr_idx is not None:
+            critical_path.append(tasks[curr_idx])
+            successors = np.where(dep_matrix[curr_idx])[0]
+            curr_idx = successors[np.argmax(distances[successors])] if len(successors) > 0 else None
+            
+        # Cache result
+        self.critical_path_cache[cache_key] = critical_path
+        return critical_path
+
+    def _schedule_batch(self, orders: List[Order], recipe: Recipe) -> List[ScheduledTask]:
+        """Schedule a batch using hybrid optimization"""
+        # Generate initial population
+        population = self._generate_initial_population(orders, recipe)
+        
+        best_schedule = None
+        best_score = float('-inf')
+        
+        for iteration in range(self.max_iterations):
+            # Apply genetic operators
+            new_population = []
+            elite = sorted(population, key=self._calculate_ets_score)[-2:]
+            
+            while len(new_population) < self.population_size:
+                if random.random() < self.crossover_rate:
+                    parent1, parent2 = self._tournament_select(population)
+                    child1, child2 = self._crossover(parent1, parent2)
+                    
+                    if random.random() < self.mutation_rate:
+                        child1 = self._mutate(child1)
+                    if random.random() < self.mutation_rate:
+                        child2 = self._mutate(child2)
+                        
+                    new_population.extend([child1, child2])
+                    
+            # Add elite solutions
+            new_population.extend(elite)
+            
+            # Local search on best solution
+            best_candidate = max(new_population, key=self._calculate_ets_score)
+            improved = self._local_search(best_candidate)
+            
+            score = self._calculate_ets_score(improved)
+            if score > best_score:
+                best_score = score
+                best_schedule = improved
+                
+            population = new_population
+            
+        return best_schedule
+
+    def _local_search(self, schedule: List[ScheduledTask]) -> List[ScheduledTask]:
+        """Local search with tabu elements"""
+        current = schedule
+        tabu_list = set()
+        
+        for _ in range(self.local_search_iters):
+            # Get neighborhood excluding tabu moves
+            neighbors = self._get_neighbors(current)
+            valid_neighbors = [n for n in neighbors if self._get_move_hash(n) not in tabu_list]
+            
+            if not valid_neighbors:
+                continue
+                
+            # Select best non-tabu neighbor
+            best_neighbor = max(valid_neighbors, key=self._calculate_ets_score)
+            move_hash = self._get_move_hash(best_neighbor)
+            
+            # Update tabu list
+            tabu_list.add(move_hash)
+            if len(tabu_list) > 10:  # Keep tabu list size bounded
+                tabu_list.pop()
+                
+            current = best_neighbor
+            
+        return current
+
+    def _get_move_hash(self, schedule: List[ScheduledTask]) -> int:
+        """Generate hash for tabu list"""
+        return hash(tuple((t.orderId, t.startTime, t.endTime) for t in schedule))
+
+    def _is_feasible(self, schedule: List[ScheduledTask]) -> bool:
+        """Check schedule feasibility with caching"""
+        # Check resource conflicts using vectorized operations
+        resources = defaultdict(list)
+        for task in schedule:
+            for resource in task.resources:
+                resources[resource].append((task.startTime, task.endTime))
+                
+        for resource, intervals in resources.items():
+            if resource in self.resource_usage_cache:
+                cached = self.resource_usage_cache[resource]
+                if any(i1[1] > i2[0] for i1, i2 in zip(intervals[:-1], intervals[1:])):
+                    return False
+            else:
+                # Cache resource usage pattern
+                self.resource_usage_cache[resource] = sorted(intervals)
+                
+        # Check precedence constraints
+        for order_id in {task.orderId for task in schedule}:
+            if order_id in self.dependency_cache:
+                continue
+                
+            order_tasks = sorted(
+                [t for t in schedule if t.orderId == order_id],
+                key=lambda t: t.startTime
+            )
+            
+            recipe = self.recipes[order_tasks[0].step.split('_')[0]]
+            expected_steps = [s.name for s in recipe.steps]
+            actual_steps = [t.step.split('_')[1] for t in order_tasks]
+            
+            if actual_steps != expected_steps:
+                return False
+                
+            # Cache valid dependency chain
+            self.dependency_cache[order_id] = True
+            
+        return True
+
+    def schedule_orders(self, orders: List[Order]) -> List[ScheduledTask]:
+        """Main scheduling function"""
+        sorted_orders = sorted(orders, key=lambda o: (o.delivery_date, o.delivery_slot))
+        all_tasks = []
+        
+        # Clear caches
+        self._setup_caches()
+        
+        # Group orders optimally for batching
+        order_batches = self._group_orders_for_batching(sorted_orders)
+        
+        # Schedule each batch
+        for product_type, batch_orders in order_batches.items():
+            recipe = self.recipes[product_type]
+            batch_tasks = self._schedule_batch(batch_orders, recipe)
+            all_tasks.extend(batch_tasks)
+            
+        return sorted(all_tasks, key=lambda t: t.startTime)
