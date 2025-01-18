@@ -16,6 +16,7 @@ export interface GanttTask extends BaseTask {
   custom_class: string;
   _data: {
     originalTask: ScheduledTask;
+    groupName: string;
   };
 }
 
@@ -38,15 +39,15 @@ export interface Product {
 }
 
 export interface Ingredient {
-  name: string;
+  product: Product;
   unit: string;
-  qty: string;
+  qty: number;
 }
 
 // Step interface matching JSON structure
 export interface Step {
-  id: string;
-  name: 'mixing' | 'chilling' | 'shaping' | 'baking' | 'cooling' | 'proofing';
+  id: number;
+  name: ProductionStep;
   duration: number;
   requiresHuman: boolean;
   requiresOven: boolean;
@@ -91,8 +92,7 @@ export interface Order {
 export type OrderStatus = 'new' | 'pending' | 'in-progress' | 'completed' | 'cancelled';
 export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'blocked';
 export type ProductionStep = 'mixing' | 'chilling' | 'shaping' | 'baking' | 'cooling' | 'proofing';
-export type ViewMode = FrappeViewMode
-
+export type ViewMode = FrappeViewMode;
 
 export interface ScheduledTask {
   id: string;
@@ -134,12 +134,20 @@ export interface ViewModeConfig {
 
 // Type guard for runtime checking
 export function isGanttTask(task: any): task is GanttTask {
-  return task && '_data' in task && task._data?.originalTask !== undefined;
+  return task && 
+         '_data' in task && 
+         task._data?.originalTask !== undefined &&
+         task._data?.groupName !== undefined;
+}
+
+// Optional: Add helper type for Gantt popup
+export interface GanttPopupData {
+  task: GanttTask;
 }
 
 // Constants
 export const DEFAULT_OPTIONS: GanttOptions = {
-  viewMode: 'Day', 
+  viewMode: 'Day',
   barHeight: 30,
   headerHeight: 65,
   padding: 18,
@@ -152,7 +160,10 @@ export const DEFAULT_OPTIONS: GanttOptions = {
 };
 
 export const PRODUCTION_STEPS: ProductionStep[] = [
-  'mixing', 'chilling', 'shaping', 'baking', 'cooling', 'proofing'
+  'mixing', 
+  'chilling', 
+  'shaping', 
+  'baking', 'cooling', 'proofing'
 ];
 
 export const STEP_COLORS: Record<ProductionStep, string> = {
@@ -173,19 +184,22 @@ export const STEP_HOVER_COLORS: Record<ProductionStep, string> = {
   proofing: 'group-hover:bg-yellow-600'
 };
 
-export const VIEW_MODES: Record<ViewMode, ViewModeConfig> = {
-  'Minute': { 
-    hours: Array.from({ length: 1440 }, (_, i) => Math.floor(i / 60)), 
+// Update FrappeViewMode type to match the actual strings used
+export type FrappeViewMode = 'Minute' | 'Hour' | 'Quarter Day' | 'Half Day' | 'Day' | 'Week' | 'Month';
+
+export const VIEW_MODES: Record<FrappeViewMode, ViewModeConfig> = {
+  'Minute': {
+    hours: Array.from({ length: 1440 }, (_, i) => Math.floor(i / 60)),
     columnWidth: 50,
     label: (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   },
-  'Hour': { 
-    hours: Array.from({ length: 24 }, (_, i) => i), 
+  'Hour': {
+    hours: Array.from({ length: 24 }, (_, i) => i),
     columnWidth: 100,
     label: (date: Date) => `${date.getHours()}:00`
   },
-  'Quarter Day': { 
-    hours: [0, 6, 12, 18], 
+  'Quarter Day': {
+    hours: [0, 6, 12, 18],
     columnWidth: 200,
     label: (date: Date) => {
       const hours = date.getHours();
@@ -196,18 +210,18 @@ export const VIEW_MODES: Record<ViewMode, ViewModeConfig> = {
       return '';
     }
   },
-  'Half Day': { 
-    hours: [0, 12], 
+  'Half Day': {
+    hours: [0, 12],
     columnWidth: 300,
     label: (date: Date) => date.getHours() === 0 ? '00:00' : '12:00'
   },
-  'Day': { 
-    hours: Array.from({ length: 24 }, (_, i) => i), 
+  'Day': {
+    hours: Array.from({ length: 24 }, (_, i) => i),
     columnWidth: 100,
     label: (date: Date) => `${date.getHours()}:00`
   },
-  'Week': { 
-    hours: [0, 6, 12, 18], 
+  'Week': {
+    hours: [0, 6, 12, 18],
     columnWidth: 200,
     label: (date: Date) => {
       const hours = date.getHours();
@@ -218,45 +232,27 @@ export const VIEW_MODES: Record<ViewMode, ViewModeConfig> = {
       return '';
     }
   },
-  'Month': { 
-    hours: [1], 
+  'Month': {
+    hours: [1],
     columnWidth: 400,
     label: (date: Date) => date.toLocaleDateString([], { month: 'short' })
   }
 };
 
-// Utility functions
-export const formatDateToISO = (date: Date): string => {
-  return date.toISOString();
-};
-
-
-// Update the FrappeViewMode type to exactly match the strings you're using
-export type FrappeViewMode = 'Minute' | 'Hour' | 'Quarter Day' | 'Half Day' | 'Day' | 'Week' | 'Month';
-
-
-
-
-
 export function extendGanttViewModes(Gantt: any) {
-  // Create a Minute view mode similar to other view modes
   Gantt.VIEW_MODE.MINUTE = {
     name: 'Minute',
-    step: '15min',  // 15-minute steps
+    step: '15min',
     column_width: 50,
     padding: ['1d', '1d'],
-    // Add any other necessary properties matching the structure of other view modes
-    upper_text: (date: Date) => date.toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    upper_text: (date: Date) => date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
     }),
     lower_text: (date: Date) => date.toLocaleString()
   };
-
   return Gantt;
 }
-
-
 
 // Gantt Configuration
 export const GANTT_CONFIG = {
@@ -272,8 +268,9 @@ export const GANTT_CONFIG = {
 export interface GanttChartProps {
   tasks: ScheduledTask[];
   viewMode: FrappeViewMode;
-  filteredSteps: Set<string>;
+  filteredSteps: Set<ProductionStep>;
   onTasksUpdate?: (tasks: ScheduledTask[]) => void;
   onDateChange?: (task: ScheduledTask, start: Date, end: Date) => void;
   onProgressChange?: (task: ScheduledTask, progress: number) => void;
 }
+

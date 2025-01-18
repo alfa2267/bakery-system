@@ -6,6 +6,9 @@ import logging
 from pathlib import Path
 from .config import DATABASE_URL
 import traceback
+import uuid
+import json
+from sqlalchemy import func
 
 # Create Base only once
 Base = declarative_base()
@@ -40,13 +43,161 @@ def get_db():
     finally:
         db.close()
 
+def create_default_data(session):
+    """Create default products and recipes in the database"""
+    from .models import ProductDB, RecipeDB, RecipeStepDB, RecipeIngredientDB
+    
+    # Check if products already exist
+    if session.query(ProductDB).first():
+        logger.info("Default data already exists in database")
+        return
+
+    logger.info("Creating default entries")
+    
+    try:
+        # Products data with predefined IDs
+        products_data = [
+            {
+                "id": 23,
+                "name": "cookies",
+                "shelf_life": "7 days",
+                "price": [{"amount": 30, "unit": "kg", "qty": 3}]
+            },
+            {
+                "id": 24,
+                "name": "brownies",
+                "shelf_life": "5 days",
+                "price": [{"amount": 35, "unit": "kg", "qty": 2.5}]
+            },
+            {
+                "id": 25,
+                "name": "cake",
+                "shelf_life": "3 days",
+                "price": [{"amount": 40, "unit": "kg", "qty": 2}]
+            },
+            {
+                "id": 26,
+                "name": "cinnamon rolls",
+                "shelf_life": "4 days",
+                "price": [{"amount": 25, "unit": "kg", "qty": 4}]
+            },
+            # Ingredient products
+            {"id": 27, "name": "Eggs"},
+            {"id": 28, "name": "Flour"},
+            {"id": 29, "name": "Butter"},
+            {"id": 30, "name": "Sugar"},
+            {"id": 31, "name": "Cocoa Powder"},
+            {"id": 32, "name": "Baking Powder"}
+        ]
+
+        # Create products
+        for product_info in products_data:
+            product = ProductDB(
+                id=product_info['id'], 
+                name=product_info['name']
+            )
+            session.add(product)
+        session.flush()
+
+        # Recipes with predefined data
+        recipes_data = [
+            {
+                "id": 1001,
+                "product_id": 23,
+                "requires_chilling": True,
+                "max_chill_time": 240,
+                "min_batch_size": 3,
+                "max_batch_size": 12,
+                "unit": "whole",
+                "ingredients": [
+                    {"product_id": 27, "quantity": 0.3, "unit": "kg"},
+                    {"product_id": 28, "quantity": 0.5, "unit": "kg"},
+                    {"product_id": 29, "quantity": 0.2, "unit": "kg"},
+                    {"product_id": 30, "quantity": 0.4, "unit": "kg"},
+                ],
+                "steps": [
+                    {"id": 14, "name": "Mixing", "duration": 25, "order": 1, 
+                     "requires_human": True, "requires_mixer": True, "requires_oven": False, 
+                     "must_follow_immediately": False, "scaling_factor": 0.7},
+                    {"id": 15, "name": "Chilling", "duration": 240, "order": 2, 
+                     "requires_human": False, "requires_mixer": False, "requires_oven": False, 
+                     "must_follow_immediately": False, "scaling_factor": 1.0},
+                    {"id": 16, "name": "Shaping", "duration": 30, "order": 3, 
+                     "requires_human": True, "requires_mixer": False, "requires_oven": False, 
+                     "must_follow_immediately": True, "scaling_factor": 1.0},
+                    {"id": 17, "name": "Baking", "duration": 15, "order": 4, 
+                     "requires_human": False, "requires_mixer": False, "requires_oven": True, 
+                     "must_follow_immediately": True, "scaling_factor": 1.0},
+                ],
+            },
+            # Similar structure for Brownies and Cake recipes...
+        ]
+
+        # Create recipes
+        for recipe_data in recipes_data:
+            recipe = RecipeDB(
+                id=recipe_data['id'],
+                product_id=recipe_data['product_id'],
+                requires_chilling=recipe_data['requires_chilling'],
+                max_chill_time=recipe_data['max_chill_time'],
+                min_batch_size=recipe_data['min_batch_size'],
+                max_batch_size=recipe_data['max_batch_size'],
+                unit=recipe_data['unit']
+            )
+            session.add(recipe)
+            session.flush()
+
+            # Add ingredients
+            for ing_data in recipe_data['ingredients']:
+                ingredient = RecipeIngredientDB(
+                    recipe_id=recipe.id,
+                    product_id=ing_data['product_id'],
+                    quantity=ing_data['quantity'],
+                    unit=ing_data['unit']
+                )
+                session.add(ingredient)
+
+            # Add steps
+            for step_data in recipe_data['steps']:
+                step = RecipeStepDB(
+                    id=step_data['id'],
+                    recipe_id=recipe.id,
+                    name=step_data['name'],
+                    duration=step_data['duration'],
+                    order=step_data['order'],
+                    requires_human=step_data['requires_human'],
+                    requires_oven=step_data['requires_oven'],
+                    requires_mixer=step_data['requires_mixer'],
+                    must_follow_immediately=step_data['must_follow_immediately'],
+                    scaling_factor=step_data['scaling_factor']
+                )
+                session.add(step)
+
+        session.commit()
+        logger.info("Default data created successfully")
+        
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error creating default data: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
+
+# Rest of the file remains the same as in the previous version
 def check_tables_exist() -> bool:
     """Check if all required tables exist in the database"""
     try:
         logger.info("Checking if required tables exist in the database...")
         inspector = inspect(engine)
         existing_tables = inspector.get_table_names()
-        required_tables = ['orders', 'order_items', 'scheduled_tasks']
+        required_tables = [
+            'products',
+            'recipes',
+            'recipe_steps',
+            'recipe_ingredients',
+            'orders',
+            'order_items',
+            'scheduled_tasks'
+        ]
         
         missing_tables = [table for table in required_tables if table not in existing_tables]
         
@@ -59,7 +210,6 @@ def check_tables_exist() -> bool:
         session = SessionLocal()
         try:
             for table in required_tables:
-                # Attempt to query each table to verify its structure
                 logger.info(f"Verifying table structure for {table}")
                 session.execute(text(f"SELECT * FROM {table} LIMIT 1"))
             session.commit()
@@ -73,37 +223,6 @@ def check_tables_exist() -> bool:
         return True
     except Exception as e:
         logger.error(f"Error checking tables: {str(e)}")
-        return False
-
-def create_tables():
-    """Create database tables with detailed logging"""
-    try:
-        # Import models here to avoid circular imports
-        from .models import OrderDB, OrderItemDB, ScheduledTaskDB
-        
-        logger.info("Creating database tables...")
-        
-        # Drop existing tables (optional, remove if you want to preserve data)
-        Base.metadata.drop_all(bind=engine)
-        
-        # Create tables
-        Base.metadata.create_all(bind=engine)
-        logger.info("Database tables created successfully")
-        
-        # Verify table creation
-        inspector = inspect(engine)
-        created_tables = inspector.get_table_names()
-        required_tables = ['orders', 'order_items', 'scheduled_tasks']
-        
-        for table in required_tables:
-            if table not in created_tables:
-                logger.error(f"Failed to create table: {table}")
-                return False
-        
-        logger.info("Table creation verified")
-        return True
-    except Exception as e:
-        logger.error(f"Error creating tables: {str(e)}")
         return False
 
 def verify_db_connection():
@@ -120,6 +239,7 @@ def verify_db_connection():
         return False
 
 def init_db():
+    """Initialize database with comprehensive error handling"""
     try:
         logger.info("Starting database initialization...")
         
@@ -134,48 +254,19 @@ def init_db():
         if not verify_db_connection():
             raise Exception("Could not establish database connection")
         
-        # Attempt to create tables
+        # Create all tables
         Base.metadata.create_all(bind=engine)
+        
+        # Create default data
+        session = SessionLocal()
+        try:
+            create_default_data(session)
+        finally:
+            session.close()
         
         logger.info("Database initialization completed successfully")
         return True
-    except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
-        logger.error(traceback.format_exc())
-        raise
-
-    """Initialize database with comprehensive error handling"""
-    try:    
-        # Verify connection
-        if not verify_db_connection():
-            raise Exception("Could not connect to database")
-
-        # Create tables if they don't exist
-        if not check_tables_exist():
-            logger.info("Attempting to create missing tables...")
-            if not create_tables():
-                raise Exception("Failed to create tables")
-
-            # Comprehensive verification after table creation
-            session = SessionLocal()
-            try:
-                # Verify each table can be queried
-                from .models import OrderDB, OrderItemDB, ScheduledTaskDB
-                
-                # Test querying each table model
-                session.query(OrderDB).first()
-                session.query(OrderItemDB).first()
-                session.query(ScheduledTaskDB).first()
-                
-                session.commit()
-            except Exception as query_error:
-                logger.error(f"Table query verification failed: {str(query_error)}")
-                raise Exception("Tables verification failed after creation")
-            finally:
-                session.close()
-
-        logger.info("Database initialized successfully")
-        return True
+        
     except Exception as e:
         logger.error(f"Database initialization failed: {str(e)}")
         logger.error(traceback.format_exc())

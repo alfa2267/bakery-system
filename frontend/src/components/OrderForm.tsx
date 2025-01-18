@@ -41,7 +41,7 @@ const OrderForm: React.FC = () => {
     const fetchRecipes = async () => {
       setIsLoading(true);
       try {
-        const response = await bakeryApi.getAvailableRecipes();
+        const response = await bakeryApi.getRecipes();
       //  console.log('Raw API response:', response); // Debug log
         
         // Ensure we have an array of recipes
@@ -288,7 +288,7 @@ const OrderForm: React.FC = () => {
                   </div>
                   {recipe.ingredients && (
                     <div className="text-xs text-gray-500 mt-1">
-                      Ingredients: {recipe.ingredients.map(ing => ing.name).join(', ')}
+                      Ingredients: {recipe.ingredients.map(ing => ing.product.name).join(', ')}
                     </div>
                   )}
                 </div>

@@ -1,12 +1,10 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, Float, ForeignKey, DateTime, JSON
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 import uuid
 
-# Instead, ensure you're importing Base from database
 from .database import Base
 
 # SQLAlchemy Database Models
@@ -16,55 +14,70 @@ class ProductDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, unique=True)
     
-    # Optional: Add relationships to order items and recipes if needed
     order_items = relationship("OrderItemDB", back_populates="product")
     recipes = relationship("RecipeDB", back_populates="product")
+    recipe_ingredients = relationship("RecipeIngredientDB", back_populates="product")  # Add this line
 
-    class Config:
-        from_attributes = True
 
-        
 
 class OrderItemDB(Base):
     __tablename__ = "order_items"
     
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(String, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
-    
-    # Foreign key to ProductDB
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    
-    # Relationship to ProductDB
-    product = relationship("ProductDB", back_populates="order_items")
-    
     quantity = Column(Integer, nullable=False)
     
+    product = relationship("ProductDB", back_populates="order_items")
     order = relationship("OrderDB", back_populates="items")
     tasks = relationship("ScheduledTaskDB", back_populates="order_item", cascade="all, delete-orphan")
+
+class RecipeStepDB(Base):
+    __tablename__ = "recipe_steps"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    recipe_id = Column(Integer, ForeignKey("recipes.id"), nullable=False)
+    name = Column(String, nullable=False)
+    duration = Column(Integer, nullable=False)
+    order = Column(Integer, nullable=False)
+    requires_human = Column(Boolean, default=False)
+    requires_oven = Column(Boolean, default=False)
+    requires_mixer = Column(Boolean, default=False)
+    must_follow_immediately = Column(Boolean, default=False)
+    scaling_factor = Column(Float, default=1.0)
+    
+    recipe = relationship("RecipeDB", back_populates="steps")
+
+class RecipeIngredientDB(Base):
+    __tablename__ = "recipe_ingredients"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    recipe_id = Column(Integer, ForeignKey("recipes.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)  # Add this
+    quantity = Column(Float, nullable=False)
+    unit = Column(String, nullable=False)
+    
+    product = relationship("ProductDB")  # Simplified relationship
+    recipe = relationship("RecipeDB", back_populates="ingredients")
 
 class RecipeDB(Base):
     __tablename__ = "recipes"
     
     id = Column(Integer, primary_key=True, index=True)
-    
-    # Foreign key to ProductDB
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    
-    # Relationship to ProductDB
-    product = relationship("ProductDB", back_populates="recipes")
-    
-    ingredients = Column(JSON, nullable=False)
-    steps = Column(JSON, nullable=False)
     requires_chilling = Column(Boolean, nullable=False)
     max_chill_time = Column(Integer, nullable=False)
     min_batch_size = Column(Integer, nullable=False)
     max_batch_size = Column(Integer, nullable=False)
     unit = Column(String, nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)  # Add this line
+    product = relationship("ProductDB", back_populates="recipes")
+    steps = relationship("RecipeStepDB", back_populates="recipe", cascade="all, delete-orphan")
+    ingredients = relationship("RecipeIngredientDB", back_populates="recipe", cascade="all, delete-orphan")
 
 class OrderDB(Base):
     __tablename__ = "orders"
     
-    id = Column(String, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True)
     customer_name = Column(String, nullable=False)
     delivery_date = Column(String, nullable=False)
     delivery_slot = Column(String, nullable=False)
@@ -81,6 +94,7 @@ class ScheduledTaskDB(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(String, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    order_item_id = Column(Integer, ForeignKey("order_items.id", ondelete="CASCADE"), nullable=False)
     step = Column(String, nullable=False)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
@@ -88,19 +102,19 @@ class ScheduledTaskDB(Base):
     batch_size = Column(Integer, nullable=False)
     status = Column(String, nullable=False, default='pending')
     
-    # New field to associate task with a specific product/item
-    order_item_id = Column(Integer, ForeignKey("order_items.id", ondelete="CASCADE"), nullable=False)
-    
     order = relationship("OrderDB", back_populates="tasks")
     order_item = relationship("OrderItemDB", back_populates="tasks")
 
-# Pydantic Models for Validation and Serialization
+# Pydantic Models
 class Product(BaseModel):
-    id: int
+    id: Optional[int] = None  # Make ingredient id optional
     name: str
 
+    class Config:
+        from_attributes = True
+
 class ProductionStep(BaseModel):
-    id: Optional[str] = None
+    id: Optional[int] = None  # Change to integer
     name: str
     duration: int = Field(gt=0)
     requiresHuman: bool
@@ -109,15 +123,22 @@ class ProductionStep(BaseModel):
     mustFollowImmediately: bool
     scalingFactor: Optional[float] = Field(gt=0.0, default=1.0)
 
+    class Config:
+        from_attributes = True
+
 class Ingredient(BaseModel):
-    name: str
+    id: Optional[int] = None  # Make ingredient id optional
+    product: Product  # Add this line
     unit: str
-    qty: str
+    qty: float
+
+    class Config:
+        from_attributes = True
 
 class Recipe(BaseModel):
-    id: int
-    product: Product
+    id: Optional[int] = None  # Make id optional
     ingredients: List[Ingredient]
+    product: Product
     steps: List[ProductionStep]
     requiresChilling: bool
     maxChillTime: int = Field(ge=0)
@@ -157,24 +178,19 @@ class Order(BaseModel):
         alias_generator = lambda field: ''.join(word.capitalize() if i > 0 else word for i, word in enumerate(field.split('_')))
 
     def __init__(self, **data):
-        # Handle ID generation
         if 'id' not in data or not data['id']:
             data['id'] = str(uuid.uuid4())
         
-        # Handle timestamps
         now = datetime.utcnow().isoformat()
         if 'created_at' not in data:
             data['created_at'] = now
         if 'updated_at' not in data:
             data['updated_at'] = now
 
-        # Set default status if not provided
         if 'status' not in data:
             data['status'] = 'new'
 
         super().__init__(**data)
-
-
 
 class ScheduledTask(BaseModel):
     orderId: str
@@ -182,17 +198,16 @@ class ScheduledTask(BaseModel):
     startTime: datetime
     endTime: datetime
     resources: List[str]
-    batchSize: int = Field(gt=0)  # Must be positive
+    batchSize: int = Field(gt=0)
     status: Optional[str] = 'pending'
-    product: Optional[Product] = None  # Fixed: proper type annotation
+    product: Optional[Product] = None
 
     class Config:
         from_attributes = True
         
     @property
     def duration(self) -> int:
-        return int((self.endTime - self.startTime).total_seconds() / 60)  # Duration in minutes
-
+        return int((self.endTime - self.startTime).total_seconds() / 60)
 
 class ValidationResponse(BaseModel):
     isValid: bool
@@ -208,7 +223,6 @@ class ScheduleResponse(BaseModel):
             return 0
         return int((max(t.endTime for t in self.tasks) - min(t.startTime for t in self.tasks)).total_seconds() / 60)
 
-# Additional helper models
 class ResourceUtilization(BaseModel):
     resource: str
     utilization_percentage: float = Field(ge=0.0, le=100.0)
@@ -222,3 +236,6 @@ class DailyScheduleSummary(BaseModel):
     resource_utilization: List[ResourceUtilization]
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

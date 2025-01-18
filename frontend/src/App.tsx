@@ -1,14 +1,15 @@
 // src/App.tsx
 import React, { useState } from 'react';
-import { ChefHat, Calendar, User, PlusCircle, ClipboardList } from 'lucide-react';
+import { ChefHat, Calendar, User, PlusCircle, ClipboardList, VeganIcon, BookAIcon } from 'lucide-react';
 import OrderForm from './components/OrderForm';
 import GanttView from './components/GanttView';
 import BakerView from './components/BakerView';
 import OrdersView from './components/OrdersView';
-import Gantt from 'frappe-gantt';
+import RecipesView from './components/RecipesView';
+import ProductsView from './components/ProductsView';
 
 
-type ViewMode = 'new-order' | 'manager' | 'baker1' | 'baker2' | 'orders';
+type ViewMode = 'new-order' | 'manager' | 'baker1' | 'baker2' | 'orders' | 'recipes' | 'products';
 
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('manager');
@@ -67,6 +68,17 @@ const App: React.FC = () => {
                 icon={<ChefHat className="w-4 h-4" />}
                 label="Baker 2"
               />
+                <NavButton
+                mode="recipes"
+                icon={<VeganIcon className="w-4 h-4" />}
+                label="Recipes"
+              />
+                  <NavButton
+                mode="products"
+                icon={<VeganIcon className="w-4 h-4" />}
+                label="Products"
+              />
+               
             </div>
           </div>
         </div>
@@ -80,6 +92,10 @@ const App: React.FC = () => {
           <GanttView />
         ) : viewMode === 'orders' ? (
           <OrdersView />
+        ) : viewMode === 'recipes' ? (
+          <RecipesView />
+        ) : viewMode === 'products' ? (
+          <ProductsView />
         ) : (
           <BakerView selectedBaker={viewMode === 'baker1' ? 'Baker1' : 'Baker2'} />
         )}

@@ -5,7 +5,8 @@ import {
   Resource,
   Recipe,
   BaseTask,
-  TaskStatus
+  TaskStatus,
+  Product
 } from '../types';
 
 const API_BASE_URL = (() => {
@@ -227,7 +228,17 @@ export const bakeryApi = {
     return { tasks: result.tasks || [] };
   },
 
-  getAvailableRecipes: async (): Promise<Recipe[]> => {
+
+  getRecipe: async (recipeId: number): Promise<Recipe> => {
+    const response = await fetch(`${API_BASE_URL}/recipes/${recipeId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return handleResponse<Recipe>(response);
+  },
+
+
+  getRecipes: async (): Promise<Recipe[]> => {
     const response = await fetch(`${API_BASE_URL}/recipes`);
     const data = await handleResponse<RecipesResponse>(response);
     
@@ -240,5 +251,64 @@ export const bakeryApi = {
     }
     
     throw new Error('Invalid recipes data structure');
-  }
+  },
+
+
+createRecipe: async (recipe: Recipe): Promise<Recipe> => {
+  const response = await fetch(`${API_BASE_URL}/recipes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(recipe),
+  });
+  return handleResponse<Recipe>(response);
+},
+
+updateRecipe: async (recipeId: number, recipe: Recipe): Promise<Recipe> => {
+  const response = await fetch(`${API_BASE_URL}/recipes/${recipeId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(recipe),
+  });
+  return handleResponse<Recipe>(response);
+},
+
+deleteRecipe: async (recipeId: number): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/recipes/${recipeId}`, {
+    method: 'DELETE',
+  });
+  return handleResponse<void>(response);
+},
+
+
+// Add these methods to your bakeryApi object
+getProducts: async (): Promise<Product[]> => {
+  const response = await fetch(`${API_BASE_URL}/products`);
+  return handleResponse<Product[]>(response);
+},
+
+createProduct: async (product: Omit<Product, 'id'>): Promise<Product> => {
+  const response = await fetch(`${API_BASE_URL}/products`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(product),
+  });
+  return handleResponse<Product>(response);
+},
+
+updateProduct: async (productId: number, product: Omit<Product, 'id'>): Promise<Product> => {
+  const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(product),
+  });
+  return handleResponse<Product>(response);
+},
+
+deleteProduct: async (productId: number): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
+    method: 'DELETE',
+  });
+  await handleResponse<void>(response);
+}
+
 };

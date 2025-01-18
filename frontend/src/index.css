@@ -33,3 +33,13 @@ code {
 .react-select__multi-value__label {
   color: #1e3a8a; /* Tailwind blue-900 */
 }
+
+.gantt .bar-wrapper.has-overlap .bar {
+  opacity: 0.8;
+}
+.gantt .bar-wrapper.has-overlap .bar-label {
+  font-weight: bold;
+}
+.gantt .bar-wrapper.has-overlap:hover .bar {
+  opacity: 1;
+}

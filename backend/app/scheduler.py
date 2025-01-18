@@ -1,340 +1,282 @@
-import json
-import logging
-import traceback
+from typing import List, Tuple, Dict, Optional
 from datetime import datetime, timedelta
-from typing import List, Tuple, Dict, Optional  # Add Optional here
-from pathlib import Path
-from .models import Order, Recipe, ProductionStep, ScheduledTask
-import uuid
+import logging
+from sqlalchemy.orm import Session
+from .models import Order, ScheduledTask, Recipe, Product
+from .repository import OrderRepository, RecipeRepository
+from .config import settings
 
-
-# Set up logging configuration
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 class BakeryScheduler:
-    def __init__(self, 
-                 recipes_path: str = None, 
-                 resources_path: str = None,
-                 equipment_path: str = None,
-                 repository: Optional[object] = None):
-        # Paths for different configuration files
-        self.recipes_path = recipes_path or Path(__file__).parent / 'recipes.json'
-        self.resources_path = resources_path or Path(__file__).parent / 'resources.json'
-        self.equipment_path = equipment_path or Path(__file__).parent / 'equipment.json'
-        
-        # Load configurations
-        self.recipes = self._load_recipes()
-        self.human_resources = self._load_human_resources()
-        self.equipment = self._load_equipment()
-        
-        # Repository for task retrieval
+    def __init__(self, repository: Optional[Session] = None):
         self.repository = repository
+        self.order_repo = OrderRepository(repository) if repository else None
+        self.recipe_repo = RecipeRepository(repository) if repository else None
         
-        self.orders = []
-        self.schedule = []
+        # Parse business hours
+        self.kitchen_open = datetime.strptime(settings.kitchen_open_time, "%H:%M").time()
+        self.kitchen_close = datetime.strptime(settings.kitchen_close_time, "%H:%M").time()
+        self.store_open = datetime.strptime(settings.store_open_time, "%H:%M").time()
+        self.store_close = datetime.strptime(settings.store_close_time, "%H:%M").time()
 
-    def _load_recipes(self) -> Dict[int, Recipe]:
-        """Load recipes from JSON file"""
-        try:
-            logger.info(f"Loading recipes from {self.recipes_path}")
-            with open(self.recipes_path, 'r') as f:
-                recipes_data = json.load(f)
-                
-            # Convert list to dictionary with product ID as key
-            recipes = {}
-            for recipe_data in recipes_data:
-                recipe = Recipe(**recipe_data)
-                recipes[recipe.product.id] = recipe
-                
-            logger.info("Recipes loaded successfully")
-            return recipes
-        except Exception as e:
-            logger.error(f"Error loading recipes: {str(e)}")
-            raise
-
-    def _load_human_resources(self) -> List[Dict]:
-        """Load human resources from JSON file"""
-        try:
-            logger.info(f"Loading human resources from {self.resources_path}")
-            with open(self.resources_path, 'r') as f:
-                human_resources = json.load(f)
-            
-            logger.info(f"Loaded {len(human_resources)} human resources")
-            for resource in human_resources:
-                logger.debug(f"Loaded resource: {resource['name']} (ID: {resource['id']})")
-            
-            return human_resources
-        except Exception as e:
-            logger.error(f"Error loading human resources: {str(e)}")
-            return []
-
-    def _load_equipment(self) -> List[Dict]:
-        """Load equipment from JSON file"""
-        try:
-            logger.info(f"Loading equipment from {self.equipment_path}")
-            with open(self.equipment_path, 'r') as f:
-                equipment_data = json.load(f)
-            
-            # Extract equipment list (assuming it's nested under 'equipment' key)
-            equipment = equipment_data.get('equipment', [])
-            
-            logger.info(f"Loaded {len(equipment)} equipment items")
-            for item in equipment:
-                logger.debug(f"Loaded equipment: {item['name']} (ID: {item['id']})")
-            
-            return equipment
-        except Exception as e:
-            logger.error(f"Error loading equipment: {str(e)}")
-            return []
-
-    def get_available_resources(self, date: str = None) -> Dict:
-        """
-        Get available resources and equipment for a specific date
-        
-        :param date: Date to check availability (defaults to current date)
-        :return: Dictionary of available resources
-        """
-        try:
-            # If no date provided, use current date
-            if not date:
-                date = datetime.now().strftime("%Y-%m-%d")
-            
-            # Get the day of the week
-            day = datetime.strptime(date, "%Y-%m-%d").strftime("%A").lower()
-
-            # Check human resources availability
-            available_humans = [
-                baker for baker in self.human_resources 
-                if baker['availability'].get(day)
-            ]
-
-            # Prepare equipment availability
-            available_equipment = [
-                {
-                    'name': item['name'],
-                    'quantity': item['quantity'],
-                    'can_be_shared': item['can_be_shared']
-                }
-                for item in self.equipment
-            ]
-
-            return {
-                'human_resources': available_humans,
-                'equipment': available_equipment
-            }
-
-        except Exception as e:
-            logger.error(f"Error retrieving available resources: {str(e)}")
-            return {'human_resources': [], 'equipment': []}
-
-    def get_items_for_baker(self, baker_name: str, date: str = None) -> List[Dict]:
-        """
-        Retrieve tasks for a specific baker
-        
-        :param baker_name: Name or ID of the baker
-        :param date: Optional date to filter tasks (defaults to current date)
-        :return: List of tasks for the baker
-        """
-        try:
-            # Check if repository is available
-            if not self.repository:
-                logger.warning("No repository available to retrieve tasks")
-                return []
-
-            # If no date provided, use current date
-            if not date:
-                date = datetime.now().strftime("%Y-%m-%d")
-
-            # Retrieve tasks for the baker on the specified date
-            baker_tasks = self.repository.get_tasks_by_date_and_resource(date, baker_name)
-            
-            # Transform tasks to match frontend expectations
-            tasks = []
-            for task in baker_tasks:
-                task_details = {
-                    "id": str(task.id),
-                    "time": task.start_time.isoformat(),
-                    "action": task.step,
-                    "details": f"{task.step} for Order {task.order_id}",
-                    "equipment": task.resources,
-                    "status": task.status or 'pending',
-                    "dependencies": [],
-                    "product": {
-                        "id": task.order_item.product.id,
-                        "name": task.order_item.product.name
-                     } if task.order_item and task.order_item.product else None 
-                }
-                tasks.append(task_details)
-
-            logger.info(f"Retrieved {len(tasks)} tasks for baker {baker_name}")
-            return tasks
-
-        except Exception as e:
-            logger.error(f"Error retrieving items for baker {baker_name}: {str(e)}")
-            logger.error(traceback.format_exc())
-            return []
-
-
-
-    def validate_order(self, order: Order) -> tuple[bool, list[str]]:
-        """
-        Validate an order against constraints
-        Returns (is_valid, warnings)
-        """
-        logger.info(f"Validating order: {order}")
+    def validate_order(self, order: Order) -> Tuple[bool, List[str]]:
+        """Validate an order against scheduling constraints."""
         warnings = []
-        
+        is_valid = True
+
         try:
-            # Validate each item in the order
+            # Check delivery date/time
+            delivery_date = datetime.strptime(order.delivery_date, "%Y-%m-%d")
+            current_date = datetime.now()
+            
+            # Validate delivery slot
+            valid_slots = [slot.id for slot in settings.delivery_slots]
+            if order.delivery_slot not in valid_slots:
+                is_valid = False
+                warnings.append(f"Invalid delivery slot. Must be one of: {', '.join(valid_slots)}")
+
+            # Check lead time (at least next day delivery)
+            if delivery_date.date() <= current_date.date():
+                is_valid = False
+                warnings.append("Delivery must be scheduled for future dates")
+
+            # Storage constraints validation
             for item in order.items:
-                # Find the recipe for this product
-                recipe = self.recipes.get(item.product.id)
-                
-                if not recipe:
-                    warnings.append(f"No recipe found for product {item.product.name}")
+                if not item.product:
+                    is_valid = False
+                    warnings.append("Each order item must have a product")
                     continue
-                
-                # Check batch size constraints
-                if item.quantity < recipe.minBatchSize:
-                    warnings.append(
-                        f"Order quantity {item.quantity} for {item.product.name} "
-                        f"is below minimum batch size of {recipe.minBatchSize}"
-                    )
-                
-                if item.quantity > recipe.maxBatchSize:
-                    warnings.append(
-                        f"Order quantity {item.quantity} for {item.product.name} "
-                        f"exceeds maximum batch size of {recipe.maxBatchSize}"
-                    )
-            
-            # Format delivery date
-            try:
-                delivery_date = datetime.strptime(order.delivery_date, "%Y-%m-%d")
-                if delivery_date.date() < datetime.now().date():
-                    warnings.append("Delivery date cannot be in the past")
-            except ValueError:
-                warnings.append("Invalid delivery date format")
-            
-            logger.info(f"Validation complete. Warnings: {warnings}")
-            return len(warnings) == 0, warnings
-            
+
+                if self.recipe_repo:
+                    recipe = self.recipe_repo.get_recipe_by_product(item.product.id)
+                    if not recipe:
+                        is_valid = False
+                        warnings.append(f"No recipe found for product {item.product.name}")
+                    elif recipe.requires_chilling:
+                        # Check if we exceed storage limits
+                        if recipe.max_chill_time > settings.freezer_storage_days * 24:
+                            is_valid = False
+                            warnings.append(f"Product {item.product.name} exceeds maximum storage time")
+
+            # Validate batch sizes
+            for item in order.items:
+                recipe = self.recipe_repo.get_recipe_by_product(item.product.id) if self.recipe_repo else None
+                if recipe:
+                    if item.quantity < recipe.min_batch_size:
+                        is_valid = False
+                        warnings.append(f"Minimum batch size for {item.product.name} is {recipe.min_batch_size}")
+                    if item.quantity > recipe.max_batch_size:
+                        is_valid = False
+                        warnings.append(f"Maximum batch size for {item.product.name} is {recipe.max_batch_size}")
+
+            return is_valid, warnings
+
+        except ValueError as e:
+            return False, [f"Invalid date format: {str(e)}"]
         except Exception as e:
-            logger.error(f"Error during order validation: {str(e)}")
-            logger.error(traceback.format_exc())
-            warnings.append(f"Validation error: {str(e)}")
-            return False, warnings
-
-    def get_available_products(self) -> List[Dict]:
-        """Return list of available products and their constraints"""
-        available_products = []
-        
-        for recipe in self.recipes.values():
-            try:
-                product_info = {
-                    "product": {
-                        "id": recipe.product.id,
-                        "name": recipe.product.name
-                    },
-                    "minBatchSize": recipe.minBatchSize,
-                    "maxBatchSize": recipe.maxBatchSize,
-                    "requiresChilling": recipe.requiresChilling,
-                    "totalProductionTime": sum(step.duration for step in recipe.steps)
-                }
-                available_products.append(product_info)
-            except Exception as e:
-                logger.error(f"Error processing recipe {recipe}: {str(e)}")
-                continue
-        
-        # Log available products by name
-        product_names = [f"{prod['product']['name']} (ID: {prod['product']['id']})" 
-                        for prod in available_products]
-        logger.info(f"Available products: {', '.join(product_names)}")
-        
-        return available_products
-
-
+            logger.error(f"Error validating order: {str(e)}")
+            return False, [f"Validation error: {str(e)}"]
 
     def schedule_order(self, order: Order) -> List[ScheduledTask]:
+        """Schedule a new order."""
+        logger.info(f"Scheduling order {order.id}")
         tasks = []
-        current_time = datetime.now()  # Start scheduling from now
 
-        for item in order.items:
-            # Find the matching recipe
-            matching_recipe = self.recipes.get(item.product.id)
+        try:
+            delivery_date = datetime.strptime(order.delivery_date, "%Y-%m-%d")
             
-            if not matching_recipe:
-                logger.error(f"No recipe found for product {item.product.name}")
-                continue
+            # Get delivery slot time
+            delivery_slot = next(slot for slot in settings.delivery_slots if slot.id == order.delivery_slot)
+            delivery_start = delivery_slot.time.split("-")[0]
+            delivery_time = datetime.strptime(delivery_start, "%H:%M").time()
+            delivery_datetime = datetime.combine(delivery_date.date(), delivery_time)
 
-            batches = self._calculate_batches(item.quantity, matching_recipe)
+            # Get existing tasks for the delivery date
+            existing_tasks = []
+            if self.order_repo:
+                existing_tasks = self.order_repo.get_tasks_by_date(order.delivery_date)
 
-            for batch_size in batches:
-                for step in matching_recipe.steps:
-                    # Get the required resources dynamically
-                    resources = self._get_required_resources(step)
+            # Schedule tasks for each order item
+            for item in order.items:
+                recipe = self.recipe_repo.get_recipe_by_product(item.product.id) if self.recipe_repo else None
+                if not recipe:
+                    raise ValueError(f"No recipe found for product {item.product.name}")
 
-                    # Calculate start_time and end_time for the step
-                    end_time = current_time + timedelta(minutes=step.duration)
-                    start_time = current_time
+                # Calculate backward from delivery time
+                current_time = delivery_datetime - timedelta(hours=1)  # Buffer hour before delivery
 
-                    # Generate a unique ID for the order item if not present
-                    order_item_id = str(uuid.uuid4()) if not hasattr(item, 'id') or item.id is None else str(item.id)
+                # Schedule each step in reverse
+                for step in reversed(recipe.steps):
+                    # Find suitable time slot
+                    start_time, end_time = self._find_time_slot(
+                        current_time,
+                        step.duration,
+                        step.requires_human,
+                        step.requires_oven,
+                        step.requires_mixer,
+                        existing_tasks,
+                        recipe.requires_chilling
+                    )
 
                     task = ScheduledTask(
                         orderId=order.id,
-                        product=item.product,
                         step=step.name,
                         startTime=start_time,
                         endTime=end_time,
-                        resources=resources,
-                        batchSize=batch_size,
-                        status="pending"
+                        resources=self._get_required_resources(step),
+                        batchSize=item.quantity,
+                        product=item.product
                     )
                     tasks.append(task)
+                    existing_tasks.append(task)
 
-                    # Update current_time for the next step in the batch
-                    current_time = end_time
+                    # Update time for next step
+                    current_time = start_time - timedelta(minutes=15)  # 15-minute gap between steps
 
-        return tasks
+            # Sort tasks by start time
+            tasks.sort(key=lambda x: x.startTime)
+            return tasks
 
+        except Exception as e:
+            logger.error(f"Error scheduling order: {str(e)}")
+            raise
 
+    def _find_time_slot(
+        self,
+        target_end_time: datetime,
+        duration: int,
+        needs_baker: bool,
+        needs_oven: bool,
+        needs_mixer: bool,
+        existing_tasks: List[ScheduledTask],
+        requires_chilling: bool
+    ) -> Tuple[datetime, datetime]:
+        """Find suitable time slot for a task working backward from target end time."""
+        start_time = target_end_time - timedelta(minutes=duration)
+        
+        # Keep trying earlier slots until we find one that works
+        while not self._is_slot_available(
+            start_time,
+            target_end_time,
+            needs_baker,
+            needs_oven,
+            needs_mixer,
+            existing_tasks,
+            requires_chilling
+        ):
+            target_end_time -= timedelta(minutes=15)
+            start_time = target_end_time - timedelta(minutes=duration)
 
+        return start_time, target_end_time
 
-    def _calculate_batches(self, quantity: int, recipe: Recipe) -> List[int]:
-        """Calculate optimal batch sizes"""
-        batches = []
-        remaining = quantity
+    def _is_slot_available(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        needs_baker: bool,
+        needs_oven: bool,
+        needs_mixer: bool,
+        existing_tasks: List[ScheduledTask],
+        requires_chilling: bool
+    ) -> bool:
+        """Check if a time slot is available considering all constraints."""
+        
+        # Check kitchen hours
+        if not (self.kitchen_open <= start_time.time() <= self.kitchen_close and
+                self.kitchen_open <= end_time.time() <= self.kitchen_close):
+            return False
 
-        while remaining > 0:
-            if remaining > recipe.maxBatchSize:
-                batches.append(recipe.maxBatchSize)
-                remaining -= recipe.maxBatchSize
-            else:
-                if remaining < recipe.minBatchSize:
-                    batches.append(recipe.minBatchSize)
-                    remaining = 0
-                else:
-                    batches.append(remaining)
-                    remaining = 0
+        # Check storage constraints for items requiring chilling
+        if requires_chilling:
+            time_until_delivery = (end_time - datetime.now()).total_seconds() / 3600
+            if time_until_delivery > settings.freezer_storage_days * 24:
+                return False
 
-        logger.debug(f"Batches calculated: {batches}")
-        return batches
+        # Count concurrent resource usage
+        concurrent_bakers = 0
+        concurrent_ovens = 0
+        concurrent_mixers = 0
 
-    def _get_required_resources(self, step: ProductionStep) -> List[str]:
+        for task in existing_tasks:
+            if self._tasks_overlap(start_time, end_time, task.startTime, task.endTime):
+                if 'baker' in task.resources:
+                    concurrent_bakers += 1
+                if 'oven' in task.resources:
+                    concurrent_ovens += 1
+                if 'mixer' in task.resources:
+                    concurrent_mixers += 1
+
+        # Check resource constraints
+        if needs_baker and concurrent_bakers >= settings.num_bakers:
+            return False
+        if needs_oven and concurrent_ovens >= settings.num_ovens:
+            return False
+        if needs_mixer and concurrent_mixers >= settings.num_mixers:
+            return False
+
+        return True
+
+    def _tasks_overlap(
+        self,
+        start1: datetime,
+        end1: datetime,
+        start2: datetime,
+        end2: datetime
+    ) -> bool:
+        """Check if two time periods overlap."""
+        return start1 < end2 and end1 > start2
+
+    def _get_required_resources(self, step: 'RecipeStepDB') -> List[str]:
+        """Get list of required resources for a step."""
         resources = []
-        if step.requiresHuman:
-            resources.append("baker")
-        if step.requiresOven:
-            resources.append("oven")
-        if step.requiresMixer:
-            resources.append("mixer")
+        if step.requires_human:
+            resources.append('baker')
+        if step.requires_oven:
+            resources.append('oven')
+        if step.requires_mixer:
+            resources.append('mixer')
         return resources
 
-    def get_recipe_steps(self, product_id: int) -> List[ProductionStep]:
-        """Retrieve the recipe steps for a specific product."""
-        recipe = self.recipes.get(product_id)
-        if not recipe:
-            logger.error(f"Recipe for product ID {product_id} not found.")
-            raise ValueError(f"Recipe for product ID {product_id} not found.")
-        return recipe.steps
+    def get_available_resources(self, date: str) -> Dict[str, List[Dict]]:
+        """Get available resources for a given date."""
+        if not self.order_repo:
+            return {
+                'staff': [],
+                'equipment': []
+            }
+
+        try:
+            tasks = self.order_repo.get_tasks_by_date(date)
+            
+            # Calculate current resource usage
+            bakers_free = settings.num_bakers
+            ovens_free = settings.num_ovens
+            mixers_free = settings.num_mixers
+
+            for task in tasks:
+                if task.status != 'completed':
+                    if 'baker' in task.resources:
+                        bakers_free -= 1
+                    if 'oven' in task.resources:
+                        ovens_free -= 1
+                    if 'mixer' in task.resources:
+                        mixers_free -= 1
+
+            return {
+                'staff': [
+                    {'name': f'Baker {i+1}', 'available': i < bakers_free}
+                    for i in range(settings.num_bakers)
+                ],
+                'equipment': [
+                    {'name': f'Oven {i+1}', 'available': i < ovens_free}
+                    for i in range(settings.num_ovens)
+                ] + [
+                    {'name': f'Mixer {i+1}', 'available': i < mixers_free}
+                    for i in range(settings.num_mixers)
+                ]
+            }
+
+        except Exception as e:
+            logger.error(f"Error getting resource availability: {str(e)}")
+            raise
