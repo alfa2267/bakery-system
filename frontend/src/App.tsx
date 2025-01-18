@@ -1,20 +1,19 @@
 // src/App.tsx
 import React, { useState } from 'react';
 import { ChefHat, Calendar, User, PlusCircle, ClipboardList, VeganIcon, BookAIcon } from 'lucide-react';
-import GanttView from './components/GanttView';
+import ScheduleView from './components/ScheduleView';
 import BakerView from './components/BakerView';
 import OrdersView from './components/OrdersView';
 import RecipesView from './components/RecipesView';
 import ProductsView from './components/ProductsView';
+import { ScreenViewMode } from './types';
 
-
-type ViewMode =  'manager' | 'baker1' | 'baker2' | 'orders' | 'recipes' | 'products';
 
 const App: React.FC = () => {
-  const [viewMode, setViewMode] = useState<ViewMode>('manager');
+  const [viewMode, setViewMode] = useState<ScreenViewMode>('manager');
 
   const NavButton: React.FC<{
-    mode: ViewMode;
+    mode: ScreenViewMode;
     icon: React.ReactNode;
     label: string;
   }> = ({ mode, icon, label }) => (
@@ -81,7 +80,7 @@ const App: React.FC = () => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         {viewMode === 'manager' ? (
-          <GanttView />
+          <ScheduleView />
         ) : viewMode === 'orders' ? (
           <OrdersView />
         ) : viewMode === 'recipes' ? (

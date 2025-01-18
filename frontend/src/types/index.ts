@@ -274,3 +274,20 @@ export interface GanttChartProps {
   onProgressChange?: (task: ScheduledTask, progress: number) => void;
 }
 
+
+export type SortField = 'id' | 'customerName' | 'deliveryDate' | 'deliverySlot' | 'location';
+export type SortDirection = 'asc' | 'desc';
+export type ScreenViewMode =  'manager' | 'baker1' | 'baker2' | 'orders' | 'recipes' | 'products' | 'list' | 'calendar';
+
+export type GroupingMode = 'step' | 'product';
+
+
+export interface GanttViewProps {
+  tasks: ScheduledTask[];
+  orders: Order[];
+  viewMode: FrappeViewMode;
+  filteredSteps: Set<ProductionStep>;
+  groupingMode: GroupingMode;
+  onDateChange: (task: ScheduledTask, start: Date, end: Date) => Promise<void>;
+  onProgressChange: (task: ScheduledTask, progress: number) => Promise<void>;
+}

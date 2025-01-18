@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { bakeryApi } from '../api/bakeryApi';
-import { Order } from '../types';
+import { Order, SortDirection, SortField } from '../types';
 import { Search, ArrowUpDown, Plus } from 'lucide-react';
 import OrderForm from './OrderForm';
 
@@ -99,8 +99,6 @@ const CardContent = ({ children, className, ...props }: React.HTMLAttributes<HTM
   <div className={`p-6 pt-0 ${className}`} {...props}>{children}</div>
 );
 
-type SortField = 'id' | 'customerName' | 'deliveryDate' | 'deliverySlot' | 'location';
-type SortDirection = 'asc' | 'desc';
 
 
 const OrderView: React.FC = () => {
