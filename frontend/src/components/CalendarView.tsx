@@ -1,135 +1,182 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { bakeryApi } from '../api/bakeryApi';
-import Select, { ActionMeta, MultiValue } from 'react-select';
+import React, { useCallback, useMemo, useRef, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { ScheduledTask, Order, FrappeViewMode, ProductionStep, PRODUCTION_STEPS } from '../types';
-import { Alert } from '../ui/Alert';
+import multiMonthPlugin from '@fullcalendar/multimonth';
+import { ScheduledTask, FrappeViewMode } from '../types';
 
-const CalendarView: React.FC = () => {
-  const [schedule, setSchedule] = useState<ScheduledTask[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [filteredSteps, setFilteredSteps] = useState<Set<ProductionStep>>(new Set());
+interface CalendarViewProps {
+  tasks: ScheduledTask[];
+  viewMode: FrappeViewMode;
+  onEventClick?: (task: ScheduledTask) => void;
+  onDateSelect?: (date: Date) => void;
+  onEventDrop?: (task: ScheduledTask, newStart: Date, newEnd: Date) => void;
+}
 
-  const stepOptions = React.useMemo(() => (
-    PRODUCTION_STEPS.map((step: ProductionStep) => ({
-      value: step,
-      label: step.charAt(0).toUpperCase() + step.slice(1),
-    }))
-  ), []);
+interface ViewSettings {
+  view: string;
+  slotDuration: string;
+  slotMinTime: string;
+  slotMaxTime: string;
+  scrollTime?: string;
+}
 
-  const handleStepFilterChange = useCallback((
-    selectedOptions: MultiValue<{ value: ProductionStep, label: string }>,
-    actionMeta: ActionMeta<{ value: ProductionStep, label: string }>
-  ) => {
-    const selectedSteps = new Set<ProductionStep>(
-      selectedOptions ? selectedOptions.map((option) => option.value) : []
-    );
-    setFilteredSteps(selectedSteps);
-  }, []);
+const getViewSettings = (viewMode: FrappeViewMode): ViewSettings => {
+  const baseSettings: ViewSettings = {
+    view: 'timeGridDay',
+    slotDuration: '01:00:00',
+    slotMinTime: '00:00:00',
+    slotMaxTime: '24:00:00',
+    scrollTime: '06:00:00'
+  };
 
-  const handleEventClick = useCallback((eventInfo: any) => {
-    // Handle event click
-    console.log('Event clicked:', eventInfo);
-  }, []);
+  switch (viewMode) {
+    case 'Minute':
+      return {
+        ...baseSettings,
+        slotDuration: '00:01:00',
+        scrollTime: '00:00:00'
+      };
+    case 'Hour':
+      return {
+        ...baseSettings,
+        slotDuration: '00:05:00',
+        scrollTime: '00:00:00'
+      };
+    case 'Quarter Day':
+      return {
+        ...baseSettings,
+        slotDuration: '00:15:00'
+      };
+    case 'Half Day':
+      return {
+        ...baseSettings,
+        slotDuration: '00:30:00'
+      };
+    case 'Day':
+      return baseSettings;
+    case 'Week':
+      return {
+        view: 'timeGridWeek',
+        slotDuration: '01:00:00',
+        slotMinTime: '06:00:00',
+        slotMaxTime: '22:00:00',
+        scrollTime: '06:00:00'
+      };
+    case 'Month':
+      return {
+        view: 'dayGridMonth',
+        slotDuration: '24:00:00',
+        slotMinTime: '00:00:00',
+        slotMaxTime: '24:00:00',
+        scrollTime: '06:00:00'
+      };
+    case 'Quarter':
+      return {
+        view: 'multiMonthYear',
+        slotDuration: '24:00:00',
+        slotMinTime: '00:00:00',
+        slotMaxTime: '24:00:00',
+        scrollTime: '06:00:00'
+      };
+    case 'Year':
+      return {
+        view: 'multiMonthYear',
+        slotDuration: '24:00:00',
+        slotMinTime: '00:00:00',
+        slotMaxTime: '24:00:00',
+        scrollTime: '06:00:00'
+      };
+  }
+};
 
-  const handleDateSelect = useCallback((dateInfo: any) => {
-    // Handle date selection
-    console.log('Date selected:', dateInfo);
-  }, []);
-
-  const handleEventDrop = useCallback((eventDropInfo: any) => {
-    // Handle event drop
-    console.log('Event dropped:', eventDropInfo);
-  }, []);
+const CalendarView: React.FC<CalendarViewProps> = ({
+  tasks,
+  viewMode,
+  onEventClick,
+  onDateSelect,
+  onEventDrop,
+}) => {
+  const calendarRef = useRef<FullCalendar>(null);
 
   useEffect(() => {
-    const fetchScheduleAndOrders = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Fetch schedule
-        const scheduleResponse = await bakeryApi.getSchedules(true);
-        if (scheduleResponse && scheduleResponse.schedule) {
-          setSchedule(scheduleResponse.schedule);
-
-          // Extract order IDs from the schedule
-          const orderIds = Array.from(
-            new Set(scheduleResponse.schedule.map(task => task.orderId))
-          );
-
-          // Fetch orders
-          const ordersResponse = await bakeryApi.getOrders();
-          if (Array.isArray(ordersResponse)) {
-            setOrders(ordersResponse);
-          }
-        }
-      } catch (error) {
-        setError(error instanceof Error ? error.message : 'Failed to load schedule and orders');
-      } finally {
-        setIsLoading(false);
+    if (calendarRef.current) {
+      const calendarApi = calendarRef.current.getApi();
+      const settings = getViewSettings(viewMode);
+      calendarApi.changeView(settings.view);
+      
+      // Update slot settings
+      calendarApi.setOption('slotDuration', settings.slotDuration);
+      calendarApi.setOption('slotMinTime', settings.slotMinTime);
+      calendarApi.setOption('slotMaxTime', settings.slotMaxTime);
+      if (settings.scrollTime) {
+        calendarApi.setOption('scrollTime', settings.scrollTime);
       }
-    };
+    }
+  }, [viewMode]);
 
-    fetchScheduleAndOrders();
-  }, []);
+  const handleEventClick = useCallback((eventInfo: any) => {
+    if (onEventClick) {
+      const task = tasks.find(t => t.id === eventInfo.event.id);
+      if (task) {
+        onEventClick(task);
+      }
+    }
+  }, [tasks, onEventClick]);
 
-  const filteredTasks = React.useMemo(() => {
-    return schedule.filter(task => filteredSteps.has(task.step));
-  }, [schedule, filteredSteps]);
+  const handleDateSelect = useCallback((dateInfo: any) => {
+    if (onDateSelect) {
+      onDateSelect(dateInfo.date);
+    }
+  }, [onDateSelect]);
 
-  const events = React.useMemo(() => {
-    return filteredTasks.map(task => ({
+  const handleEventDrop = useCallback((eventDropInfo: any) => {
+    if (onEventDrop) {
+      const task = tasks.find(t => t.id === eventDropInfo.event.id);
+      if (task) {
+        onEventDrop(
+          task,
+          eventDropInfo.event.start,
+          eventDropInfo.event.end || eventDropInfo.event.start
+        );
+      }
+    }
+  }, [tasks, onEventDrop]);
+
+  const events = useMemo(() => {
+    return tasks.map(task => ({
       id: task.id,
       title: `${task.product?.name || 'Unnamed'} (${task.orderId})`,
       start: task.startTime,
       end: task.endTime,
       className: `step-${task.step}`,
+      backgroundColor: task.status === 'completed' ? '#10B981' : // green
+                      task.status === 'in-progress' ? '#3B82F6' : // blue
+                      task.status === 'blocked' ? '#EF4444' : // red
+                      '#6B7280', // gray for pending
+      borderColor: 'transparent',
+      textColor: 'white',
+      extendedProps: {
+        status: task.status,
+        step: task.step,
+      }
     }));
-  }, [filteredTasks]);
+  }, [tasks]);
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-      </div>
-    );
-  }
-
-  if (error) return (
-    <Alert variant="error" title="Error">
-      {error}
-    </Alert>
-  );
+  const settings = getViewSettings(viewMode);
 
   return (
     <div className="h-full">
-      <div className="px-4 py-3">
-        <Select
-          id="step-filter"
-          isMulti
-          options={stepOptions}
-          value={stepOptions.filter(option => filteredSteps.has(option.value))}
-          onChange={handleStepFilterChange}
-          className="text-sm"
-          classNamePrefix="react-select"
-          placeholder="Filter steps..."
-          isSearchable={false}
-        />
-      </div>
-      <div className="h-full">
+      <div className="h-full p-4">
         <FullCalendar
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
+          ref={calendarRef}
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, multiMonthPlugin]}
+          initialView={settings.view}
           headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay',
+            left: '',
+            center: '',
+            right: '',
           }}
           events={events}
           eventClick={handleEventClick}
@@ -137,6 +184,33 @@ const CalendarView: React.FC = () => {
           eventDrop={handleEventDrop}
           editable={true}
           selectable={true}
+          selectMirror={true}
+          dayMaxEvents={true}
+          weekNumbers={true}
+          height="100%"
+          slotDuration={settings.slotDuration}
+          slotMinTime={settings.slotMinTime}
+          slotMaxTime={settings.slotMaxTime}
+          scrollTime={settings.scrollTime}
+          allDaySlot={false}
+          nowIndicator={true}
+          slotEventOverlap={false}
+          eventTimeFormat={{
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }}
+          slotLabelFormat={{
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }}
+          displayEventTime={true}
+          displayEventEnd={true}
+          eventDisplay="block"
+          eventMinHeight={25}
+          stickyHeaderDates={true}
+          expandRows={true}
         />
       </div>
     </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { bakeryApi } from '../api/bakeryApi';
 import Select, { ActionMeta, MultiValue } from 'react-select';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, List } from 'lucide-react';
 import { Alert } from '../ui/Alert';
 import { 
   ScheduledTask, 
@@ -19,11 +19,35 @@ import CalendarView from './CalendarView';
 import ListView from './ListView';
 
 
+
+
 const ScheduleView: React.FC = () => {
   const [viewMode, setViewMode] = useState<ScreenViewMode>('list');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [currentView, setCurrentView] = useState<FrappeViewMode>('Day');
   const [groupingMode, setGroupingMode] = useState<'step' | 'product'>('step');
+
+
+  // Add the NavButton component at the top level of ScheduleView
+const NavButton: React.FC<{
+  mode: ScreenViewMode;
+  icon: React.ReactNode;
+  label: string;
+  onClick: (mode: ScreenViewMode) => void;
+}> = ({ mode, icon, label, onClick }) => (
+  <button
+    onClick={() => onClick(mode)}
+    className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
+      viewMode === mode 
+        ? 'bg-blue-500 text-white' 
+        : 'bg-gray-100 hover:bg-gray-200'
+    }`}
+  >
+    {icon}
+    <span>{label}</span>
+  </button>
+);
+
   
   // State for schedule and orders
   const [schedule, setSchedule] = useState<ScheduledTask[]>([]);
@@ -66,6 +90,46 @@ const ScheduleView: React.FC = () => {
       setError('Failed to update task status');
     }
   }, []);
+
+
+
+
+  const getTitleFormat = (viewMode: FrappeViewMode, selectedDate: string) => {
+    const date = new Date(selectedDate);
+    
+    switch (viewMode) {
+      case 'Minute':
+      case 'Hour':
+      case 'Quarter Day':
+      case 'Half Day':
+      case 'Day':
+        return date.toLocaleDateString(undefined, { 
+          weekday: 'long',
+          month: 'long', 
+          day: 'numeric',
+          year: 'numeric' 
+        });
+      case 'Week':
+        const weekStart = new Date(date);
+        const weekEnd = new Date(date);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        return `${weekStart.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })} - ${
+          weekEnd.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+        }`;
+      case 'Month':
+        return date.toLocaleDateString(undefined, { 
+          month: 'long',
+          year: 'numeric' 
+        });
+      case 'Quarter':
+        const quarter = Math.floor(date.getMonth() / 3) + 1;
+        return `Q${quarter} ${date.getFullYear()}`;
+      case 'Year':
+        return date.getFullYear().toString();
+      default:
+        return '';
+    }
+  };
 
   // Fetch schedule and orders on component mount
   useEffect(() => {
@@ -139,38 +203,23 @@ const ScheduleView: React.FC = () => {
         {/* View Mode and Core Controls */}
         <div className="px-4 flex justify-between items-center mb-3">
           {/* View Mode Selector */}
+
+      
           <div className="flex bg-gray-100 rounded-lg p-0.5">
-            {(['Hour', 'Day', 'Week', 'Month', 'Quarter Day', 'Half Day'] as FrappeViewMode[]).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setCurrentView(mode)}
-                className={`px-2.5 py-1 text-sm rounded-md transition-colors ${
-                  currentView === mode ? 'bg-blue-500 text-white' : 'hover:bg-gray-200'
-                }`}
-              >
+               <span>Timeline Type</span> 
+          <select
+            value={currentView}
+            onChange={(e) => setCurrentView(e.target.value as FrappeViewMode)}
+            className="px-2.5 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            {(['Minute','Hour', 'Day', 'Quarter Day', 'Half Day', 'Week', 'Month', 'Quarter','Year'] as FrappeViewMode[]).map((mode) => (
+              <option key={mode} value={mode}>
                 {mode}
-              </button>
+              </option>
             ))}
+          </select>
           </div>
 
-          {/* Core Controls */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2">
-              <select
-                id="grouping-mode"
-                value={groupingMode}
-                onChange={(e) => setGroupingMode(e.target.value as 'step' | 'product')}
-                className="px-2.5 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="step">Group by Step</option>
-                <option value="product">Group by Product</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Date Navigation */}
-        <div className="px-4 flex justify-between items-start border-t pt-3">
           <div className="flex items-center space-x-3">
             <button 
               onClick={() => {
@@ -189,14 +238,7 @@ const ScheduleView: React.FC = () => {
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="px-3 py-1.5 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
               />
-              <span className="text-xs text-gray-500 mt-0.5">
-                {new Date(selectedDate).toLocaleDateString(undefined, { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </span>
+             
             </div>
             <button 
               onClick={() => {
@@ -209,6 +251,61 @@ const ScheduleView: React.FC = () => {
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
+
+        
+          <h2 className="text-lg font-semibold text-gray-700 mt-0.5">
+  {viewMode === 'calendar' 
+    ? getTitleFormat(currentView, selectedDate)
+    : new Date(selectedDate).toLocaleDateString(undefined, { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })
+  }
+</h2>
+
+         
+         {/* Core Controls */}
+         <div className="flex items-center space-x-4">
+            {/* View Type change */}
+            <div className="flex items-center space-x-2">
+              <NavButton 
+                mode="calendar" 
+                icon={<Calendar className="w-4 h-4" />} 
+                label="Calendar" 
+                onClick={setViewMode}
+              />
+              <NavButton 
+                mode="list" 
+                icon={<List className="w-4 h-4" />} 
+                label="List" 
+                onClick={setViewMode}
+              />
+            </div>
+
+            
+
+            
+          </div>
+
+        </div>
+
+        {/* Date Navigation */}
+        <div className="px-4 flex justify-between items-start border-t pt-3">
+          
+          {/* Grouping Mode Selector */}
+          <div className="flex items-center space-x-2">
+              <select
+                id="grouping-mode"
+                value={groupingMode}
+                onChange={(e) => setGroupingMode(e.target.value as 'step' | 'product')}
+                className="px-2.5 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="step">Group by Step</option>
+                <option value="product">Group by Product</option>
+              </select>
+            </div>
 
           {/* Step Filters */}
           <div className="w-2/3">
@@ -252,7 +349,15 @@ const ScheduleView: React.FC = () => {
       {/* Views */}
       <div className="flex-1 overflow-auto">
         {viewMode === 'list' && <ListView tasks={filteredTasks} orders={orders} />}
-        {viewMode === 'calendar' && <CalendarView />}
+        {viewMode === 'calendar' &&   <CalendarView 
+    tasks={filteredTasks}
+    viewMode={currentView}
+    onEventClick={(task) => console.log('Event clicked:', task)}
+    onDateSelect={(date) => console.log('Date selected:', date)}
+    onEventDrop={handleDateChange}
+  />
+  
+  }
         <GanttView 
           tasks={filteredTasks} 
           orders={orders}

@@ -185,7 +185,7 @@ export const STEP_HOVER_COLORS: Record<ProductionStep, string> = {
 };
 
 // Update FrappeViewMode type to match the actual strings used
-export type FrappeViewMode = 'Minute' | 'Hour' | 'Quarter Day' | 'Half Day' | 'Day' | 'Week' | 'Month';
+export type FrappeViewMode = 'Minute' | 'Hour' | 'Quarter Day' | 'Half Day' | 'Day' | 'Week' | 'Month' | 'Quarter' | 'Year';
 
 export const VIEW_MODES: Record<FrappeViewMode, ViewModeConfig> = {
   'Minute': {
@@ -236,6 +236,16 @@ export const VIEW_MODES: Record<FrappeViewMode, ViewModeConfig> = {
     hours: [1],
     columnWidth: 400,
     label: (date: Date) => date.toLocaleDateString([], { month: 'short' })
+  },
+  'Quarter': {
+    hours: [24*30*4],
+    columnWidth: 200,
+    label: (date: Date) => date.toLocaleDateString([], { year: 'numeric' })
+  },
+  'Year': {
+    hours: [24*30*12],
+    columnWidth: 200,
+    label: (date: Date) => date.toLocaleDateString([], { year: 'numeric' })
   }
 };
 
