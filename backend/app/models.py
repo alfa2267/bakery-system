@@ -18,6 +18,23 @@ class ProductDB(Base):
     recipes = relationship("RecipeDB", back_populates="product")
     recipe_ingredients = relationship("RecipeIngredientDB", back_populates="product")  # Add this line
 
+class ResourceDB(Base):
+    __tablename__ = 'resources'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    name = Column(String, nullable=False)
+    skills = Column(JSON, nullable=False)
+    availability = Column(JSON, nullable=False)
+
+# Add Equipment model definition
+
+class EquipmentDB(Base):
+    __tablename__ = 'equipment'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    name = Column(String, nullable=False)
+    quantity = Column(Integer, nullable=False)
+    can_be_shared = Column(Boolean, nullable=False)
 
 
 class OrderItemDB(Base):
@@ -78,7 +95,7 @@ class RecipeDB(Base):
 class OrderDB(Base):
     __tablename__ = "orders"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     customer_name = Column(String, nullable=False)
     delivery_date = Column(String, nullable=False)
     delivery_slot = Column(String, nullable=False)
@@ -162,7 +179,7 @@ class OrderItem(BaseModel):
         from_attributes = True
 
 class Order(BaseModel):
-    id: Optional[str] = None
+    id: Optional[int] = None
     customer_name: str
     delivery_date: str
     delivery_slot: str
@@ -179,19 +196,14 @@ class Order(BaseModel):
         alias_generator = lambda field: ''.join(word.capitalize() if i > 0 else word for i, word in enumerate(field.split('_')))
 
     def __init__(self, **data):
-        if 'id' not in data or not data['id']:
-            data['id'] = str(uuid.uuid4())
-        
-        now = datetime.utcnow().isoformat()
         if 'created_at' not in data:
-            data['created_at'] = now
+            data['created_at'] = datetime.utcnow().isoformat()
         if 'updated_at' not in data:
-            data['updated_at'] = now
-
+            data['updated_at'] = datetime.utcnow().isoformat()
         if 'status' not in data:
             data['status'] = 'new'
-
         super().__init__(**data)
+
 
 class ScheduledTask(BaseModel):
     orderId: str

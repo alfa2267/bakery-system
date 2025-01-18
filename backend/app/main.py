@@ -247,10 +247,6 @@ async def create_order(
             logger.warning(f"Order validation failed: {warnings}")
             raise HTTPException(status_code=400, detail=warnings)
 
-        if not order.id:
-            order.id = str(uuid.uuid4())
-            logger.info(f"Generated order ID: {order.id}")
-
         try:
             # Schedule the order
             scheduled_tasks = scheduler.schedule_order(order)
@@ -259,7 +255,7 @@ async def create_order(
             # Save to database
             repository = OrderRepository(db)
             db_order = repository.create_order(order, scheduled_tasks)
-            logger.info(f"Order {order.id} saved to database")
+            logger.info(f"Order {db_order.id} saved to database")
             
             return ScheduleResponse(orderId=db_order.id, tasks=scheduled_tasks)
             
@@ -280,6 +276,8 @@ async def create_order(
             status_code=500,
             detail="An unexpected error occurred during order processing"
         )
+
+
 
 @app.get("/orders")
 async def get_orders(db: Session = Depends(get_db)):

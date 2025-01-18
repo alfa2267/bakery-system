@@ -46,7 +46,7 @@ class Settings(BaseModel):
     room_temp_storage_hours: int = 4
     freezer_storage_days: int = 2
 
-    class Config:
+class Config:
         json_encoders = {
             Path: str  # Handle Path objects in JSON serialization
         }

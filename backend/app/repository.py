@@ -13,12 +13,14 @@ class OrderRepository:
     def __init__(self, db: Session):
         self.db = db
 
+
+
     def create_order(self, order: models.Order, tasks: List[models.ScheduledTask]) -> models.OrderDB:
         try:
-            logger.info("Creating order with ID: %s", order.id)
+            logger.info("Creating new order")
 
+            # Create order without ID (let database auto-generate it)
             db_order = models.OrderDB(
-                id=order.id,
                 customer_name=order.customer_name,
                 delivery_date=order.delivery_date,
                 delivery_slot=order.delivery_slot,
@@ -28,28 +30,31 @@ class OrderRepository:
                 status=order.status or 'new'
             )
 
+            # Add and flush to get the auto-generated ID
+            self.db.add(db_order)
+            self.db.flush()
+            
+            logger.info(f"Created order with ID: {db_order.id}")
+
+            # Create order items with the newly generated order ID
             db_items = []
             for item in order.items:
                 db_product = self._get(item.product)
                 db_item = models.OrderItemDB(
-                    order_id=order.id,
+                    order_id=db_order.id,  # Use the auto-generated order ID
                     product_id=db_product.id,
                     quantity=item.quantity
                 )
                 db_items.append(db_item)
 
-            logger.info("Adding order and items to the session")
-            self.db.add(db_order)
+            logger.info("Adding order items to the session")
             self.db.add_all(db_items)
-            self.db.commit()
-            logger.info("Order and items committed successfully")
-
-            for db_item in db_items:
-                self.db.refresh(db_item)
-
+            self.db.flush()  # Flush to get item IDs
+            
+            # Create scheduled tasks with the correct order and item IDs
             db_tasks = [
                 models.ScheduledTaskDB(
-                    order_id=order.id,
+                    order_id=db_order.id,  # Use the auto-generated order ID
                     order_item_id=item.id,
                     step=task.step,
                     start_time=task.startTime,
@@ -61,17 +66,22 @@ class OrderRepository:
                 for item, task in zip(db_items, tasks)
             ]
 
+            logger.info("Adding scheduled tasks to the session")
             self.db.add_all(db_tasks)
+            
+            # Commit all changes
             self.db.commit()
-            logger.info("Order and associated items and tasks committed successfully")
+            logger.info("Order, items, and tasks committed successfully")
 
+            # Refresh to get all relationships loaded
             self.db.refresh(db_order)
             return db_order
 
         except SQLAlchemyError as e:
             self.db.rollback()
-            logger.error("Error creating order with ID %s: %s", order.id, str(e))
+            logger.error(f"Error creating order: {str(e)}")
             raise HTTPException(status_code=500, detail="Database error occurred while creating the order.")
+
 
     def update_task_status(self, task_id: str, new_status: str) -> models.ScheduledTaskDB:
         """Update the status of a specific task"""
@@ -175,7 +185,115 @@ class OrderRepository:
         
         return utilization
 
-  
+
+class EquipmentRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_equipment(self, equipment_id: int) -> Optional[models.EquipmentDB]:
+        """Get specific equipment by ID"""
+        try:
+            return self.db.query(models.EquipmentDB)\
+                .filter(models.EquipmentDB.id == equipment_id)\
+                .first()
+        except SQLAlchemyError as e:
+            logger.error(f"Error fetching equipment: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching equipment")
+
+    def get_all_equipment(self) -> List[models.EquipmentDB]:
+        """Get all equipment"""
+        try:
+            return self.db.query(models.EquipmentDB).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error fetching all equipment: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching equipment")
+
+    def get_equipment_by_name(self, name: str) -> Optional[models.EquipmentDB]:
+        """Get equipment by name"""
+        try:
+            return self.db.query(models.EquipmentDB)\
+                .filter(models.EquipmentDB.name == name)\
+                .first()
+        except SQLAlchemyError as e:
+            logger.error(f"Error fetching equipment by name: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching equipment")
+
+    def get_available_equipment(self, name: str) -> int:
+        """Get number of available units for specific equipment"""
+        try:
+            equipment = self.get_equipment_by_name(name)
+            if not equipment:
+                raise HTTPException(status_code=404, detail=f"Equipment {name} not found")
+            return equipment.quantity
+        except SQLAlchemyError as e:
+            logger.error(f"Error fetching equipment availability: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching equipment availability")
+
+
+class ResourceRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_resource(self, resource_id: str) -> Optional[models.ResourceDB]:
+        """Get specific resource by ID"""
+        try:
+            return self.db.query(models.ResourceDB)\
+                .filter(models.ResourceDB.id == resource_id)\
+                .first()
+        except SQLAlchemyError as e:
+            logger.error(f"Error fetching resource: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching resource")
+
+    def get_all_resources(self) -> List[models.ResourceDB]:
+        """Get all resources"""
+        try:
+            return self.db.query(models.ResourceDB).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error fetching all resources: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching resources")
+
+    def get_resource_by_name(self, name: str) -> Optional[models.ResourceDB]:
+        """Get resource by name"""
+        try:
+            return self.db.query(models.ResourceDB)\
+                .filter(models.ResourceDB.name == name)\
+                .first()
+        except SQLAlchemyError as e:
+            logger.error(f"Error fetching resource by name: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching resource")
+
+    def get_resources_by_skill(self, skill: str) -> List[models.ResourceDB]:
+        """Get all resources that have a specific skill"""
+        try:
+            return self.db.query(models.ResourceDB)\
+                .filter(models.ResourceDB.skills.contains([skill]))\
+                .all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error fetching resources by skill: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching resources")
+
+    def get_resource_availability(self, resource_id: str, date: str) -> Dict:
+        """Get resource availability for a specific date"""
+        try:
+            resource = self.get_resource(resource_id)
+            if not resource:
+                raise HTTPException(status_code=404, detail=f"Resource {resource_id} not found")
+            
+            # Convert date string to day of week
+            date_obj = datetime.strptime(date, '%Y-%m-%d')
+            day_of_week = date_obj.strftime('%A').lower()
+            
+            # Get availability for that day
+            if day_of_week in resource.availability:
+                return resource.availability[day_of_week]
+            else:
+                return None
+                
+        except SQLAlchemyError as e:
+            logger.error(f"Error fetching resource availability: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching resource availability")
+
+
 class ProductRepository:
     def __init__(self, db: Session):
         self.db = db

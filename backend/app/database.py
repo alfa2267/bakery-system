@@ -4,11 +4,13 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.exc import SQLAlchemyError
 import logging
 from pathlib import Path
-from .config import DATABASE_URL
+from .config import DATABASE_URL, settings
 import traceback
 import uuid
 import json
 from sqlalchemy import func
+from datetime import datetime, timedelta
+import random
 
 # Create Base only once
 Base = declarative_base()
@@ -43,12 +45,14 @@ def get_db():
     finally:
         db.close()
 
+
+
 def create_default_data(session):
     """Create default products and recipes in the database"""
-    from .models import ProductDB, RecipeDB, RecipeStepDB, RecipeIngredientDB
+    from .models import ProductDB, RecipeDB, RecipeStepDB, RecipeIngredientDB, ResourceDB, EquipmentDB, OrderDB, OrderItemDB
     
-    # Check if products already exist
-    if session.query(ProductDB).first():
+    # Check if data already exists
+    if session.query(ProductDB).first() or session.query(ResourceDB).first() or session.query(EquipmentDB).first() or session.query(OrderDB).first():
         logger.info("Default data already exists in database")
         return
 
@@ -90,7 +94,7 @@ def create_default_data(session):
             {"id": 32, "name": "Baking Powder"}
         ]
 
-        # Create products
+        # Create products first as they are referenced by other entities
         for product_info in products_data:
             product = ProductDB(
                 id=product_info['id'], 
@@ -99,7 +103,87 @@ def create_default_data(session):
             session.add(product)
         session.flush()
 
-        # Recipes with predefined data
+        # Add equipment data
+        equipment_data = [
+            {
+                "id": 1,
+                "name": "oven",
+                "quantity": 2,
+                "can_be_shared": True
+            },
+            {
+                "id": 2,
+                "name": "mixer",
+                "quantity": 3,
+                "can_be_shared": False
+            },
+            {
+                "id": 3,
+                "name": "proofer",
+                "quantity": 1,
+                "can_be_shared": True
+            },
+            {
+                "id": 4,
+                "name": "refrigerator",
+                "quantity": 2,
+                "can_be_shared": True
+            },
+            {
+                "id": 5,
+                "name": "freezer",
+                "quantity": 1,
+                "can_be_shared": True
+            },
+            {
+                "id": 6,
+                "name": "work_station",
+                "quantity": 4,
+                "can_be_shared": True
+            }
+        ]
+
+        # Create equipment
+        for equipment_info in equipment_data:
+            equipment = EquipmentDB(
+                id=equipment_info['id'],
+                name=equipment_info['name'],
+                quantity=equipment_info['quantity'],
+                can_be_shared=equipment_info['can_be_shared']
+            )
+            session.add(equipment)
+        session.flush()
+
+        # Add resources data
+        resources_data = [
+            {
+                "id": 1,  # Changed to integer
+                "name": "Crubby",
+                "skills": ["all"],  # Use native Python list, column type is JSON
+                "availability": {  # Use native Python dict, column type is JSON
+                    "monday": {"start": "07:00", "end": "19:00"},
+                    "tuesday": {"start": "07:00", "end": "19:00"},
+                    "wednesday": {"start": "07:00", "end": "19:00"},
+                    "thursday": {"start": "07:00", "end": "19:00"},
+                    "friday": {"start": "07:00", "end": "19:00"},
+                    "saturday": {"start": "07:00", "end": "19:00"},
+                    "sunday": {"start": "07:00", "end": "19:00"}
+                }
+            }
+        ]
+
+        # Create resources
+        for resource_info in resources_data:
+            resource = ResourceDB(
+                id=resource_info['id'],
+                name=resource_info['name'],
+                skills=resource_info['skills'],  # SQLAlchemy will handle JSON conversion
+                availability=resource_info['availability']  # SQLAlchemy will handle JSON conversion
+            )
+            session.add(resource)
+        session.flush()
+
+        # Create recipes
         recipes_data = [
             {
                 "id": 1001,
@@ -129,11 +213,9 @@ def create_default_data(session):
                      "requires_human": False, "requires_mixer": False, "requires_oven": True, 
                      "must_follow_immediately": True, "scaling_factor": 1.0},
                 ],
-            },
-            # Similar structure for Brownies and Cake recipes...
+            }
         ]
 
-        # Create recipes
         for recipe_data in recipes_data:
             recipe = RecipeDB(
                 id=recipe_data['id'],
@@ -172,6 +254,71 @@ def create_default_data(session):
                     scaling_factor=step_data['scaling_factor']
                 )
                 session.add(step)
+        session.flush()
+
+        # Sample customer data
+        customers = [
+            ("John Smith", "123 Baker Street", 15),
+            ("Emma Wilson", "456 Pine Avenue", 20),
+            ("Michael Brown", "789 Oak Road", 25),
+            ("Sarah Davis", "321 Maple Lane", 30),
+            ("James Johnson", "654 Cedar Drive", 18),
+            ("Lisa Anderson", "987 Elm Street", 22),
+            ("Robert Taylor", "147 Birch Boulevard", 28),
+            ("Jennifer White", "258 Spruce Way", 17),
+            ("David Miller", "369 Willow Path", 23),
+            ("Mary Thompson", "741 Ash Court", 19)
+        ]
+
+        # Define delivery slots
+        delivery_slots = [
+            "10:00-12:00",
+            "12:00-14:00",
+            "14:00-16:00",
+            "16:00-17:30"
+        ]
+
+        # Product selection options for orders
+        product_options = [
+            (23, 2, 5),  # cookies (id, min_qty, max_qty)
+            (24, 1, 3),  # brownies
+            (25, 1, 2),  # cake
+            (26, 2, 4)   # cinnamon rolls
+        ]
+
+        # Generate 10 orders between Jan 18-24, 2025
+        start_date = datetime(2025, 1, 18)
+        
+        for i in range(10):
+            customer = random.choice(customers)
+            days_offset = random.randint(0, 6)
+            delivery_date = (start_date + timedelta(days=days_offset)).strftime("%Y-%m-%d")
+            delivery_slot = random.choice(delivery_slots)
+            
+            order = OrderDB(
+                customer_name=customer[0],
+                delivery_date=delivery_date,
+                delivery_slot=delivery_slot,
+                location=customer[1],
+                estimated_travel_time=customer[2],
+                created_at=datetime.utcnow(),
+                status='new'
+            )
+            session.add(order)
+            session.flush()
+
+            # Add 1-3 random products to each order
+            num_products = random.randint(1, 3)
+            selected_products = random.sample(product_options, num_products)
+            
+            for product_id, min_qty, max_qty in selected_products:
+                quantity = random.randint(min_qty, max_qty)
+                order_item = OrderItemDB(
+                    order_id=order.id,
+                    product_id=product_id,
+                    quantity=quantity
+                )
+                session.add(order_item)
 
         session.commit()
         logger.info("Default data created successfully")
@@ -182,7 +329,9 @@ def create_default_data(session):
         logger.error(traceback.format_exc())
         raise
 
-# Rest of the file remains the same as in the previous version
+
+
+
 def check_tables_exist() -> bool:
     """Check if all required tables exist in the database"""
     try:
@@ -196,7 +345,9 @@ def check_tables_exist() -> bool:
             'recipe_ingredients',
             'orders',
             'order_items',
-            'scheduled_tasks'
+            'scheduled_tasks',
+            'resources',
+            'equipment'
         ]
         
         missing_tables = [table for table in required_tables if table not in existing_tables]
