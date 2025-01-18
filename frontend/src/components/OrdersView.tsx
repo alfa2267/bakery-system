@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { bakeryApi } from '../api/bakeryApi';
 import { Order } from '../types';
-import { Search, ArrowUpDown } from 'lucide-react';
+import { Search, ArrowUpDown, Plus } from 'lucide-react';
+import OrderForm from './OrderForm';
 
 // Temporary UI component replacements until shadcn/ui components are set up
 const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
@@ -101,6 +102,7 @@ const CardContent = ({ children, className, ...props }: React.HTMLAttributes<HTM
 type SortField = 'id' | 'customerName' | 'deliveryDate' | 'deliverySlot' | 'location';
 type SortDirection = 'asc' | 'desc';
 
+
 const OrderView: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,6 +111,9 @@ const OrderView: React.FC = () => {
   const [sortField, setSortField] = useState<SortField>('deliveryDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [locationFilter, setLocationFilter] = useState<string>('all');
+  const [showOrderForm, setShowOrderForm] = useState(false);
+
+
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -196,20 +201,29 @@ const OrderView: React.FC = () => {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Orders</CardTitle>
+        <div className="flex justify-between items-center">
+          <CardTitle>Orders</CardTitle>
+          <Button 
+            onClick={() => setShowOrderForm(true)}
+            className="px-4 py-2 rounded-lg flex items-center space-x-2 bg-blue-500 text-white"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create Order
+          </Button>
+        </div>
         <div className="flex flex-col md:flex-row gap-4 mt-4">
           <div className="relative flex-1">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
             <Input
               placeholder="Search orders..."
               value={searchTerm}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8"
             />
           </div>
           <Select 
             value={locationFilter}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setLocationFilter(e.target.value)}
+            onChange={(e) => setLocationFilter(e.target.value)}
             className="w-full md:w-48"
           >
             {uniqueLocations.map(location => (
@@ -220,6 +234,8 @@ const OrderView: React.FC = () => {
           </Select>
         </div>
       </CardHeader>
+
+
       <CardContent>
         <div className="rounded-md border">
           <Table>
@@ -256,6 +272,29 @@ const OrderView: React.FC = () => {
           </Table>
         </div>
       </CardContent>
+
+      {showOrderForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            
+            <OrderForm 
+              onSubmit={async (orderData) => {
+                try {
+                  await bakeryApi.createOrder(orderData);
+                  setShowOrderForm(false);
+                  // Refresh orders list
+                  const updatedOrders = await bakeryApi.getOrders();
+                  setOrders(updatedOrders);
+                } catch (error) {
+                  console.error('Error creating order:', error);
+                }
+              }}
+              onCancel={() => setShowOrderForm(false)}
+            />
+          </div>
+        </div>
+      )}
+
     </Card>
   );
 };

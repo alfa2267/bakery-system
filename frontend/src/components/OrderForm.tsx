@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Order, OrderItem, Recipe, Product } from '../types';
-import {Alert} from '../ui/Alert';
+import { Order, OrderItem, Recipe } from '../types';
+import { Alert } from '../ui/Alert';
 import { bakeryApi } from '../api/bakeryApi';
+import { X } from 'lucide-react';
 
-const OrderForm: React.FC = () => {
+interface OrderFormProps {
+  onSubmit: (order: Order) => Promise<void>;
+  onCancel: () => void;
+}
+
+const OrderForm: React.FC<OrderFormProps> = ({ onSubmit, onCancel }) => {
   const [formData, setFormData] = useState<Partial<Order>>({
     customerName: '',
     deliveryDate: '',
@@ -11,7 +17,7 @@ const OrderForm: React.FC = () => {
     location: '',
     items: [],
     estimatedTravelTime: 30,
-    status: 'new'  // Adding default status based on OrderStatus type
+    status: 'new'
   });
 
   const [recipesData, setRecipesData] = useState<Recipe[]>([]);
@@ -112,32 +118,12 @@ const OrderForm: React.FC = () => {
         id: ''
       };
 
-      console.log(recipesData);
-
-      const response = await bakeryApi.createOrder(orderData);
-      if (response.status === 200) {
-        setSubmitSuccess(true);
-        // Reset form after successful submission
-        setFormData({
-          customerName: '',
-          deliveryDate: '',
-          deliverySlot: '',
-          location: '',
-          items: recipesData?.map(recipe => ({
-            product: {
-              id: recipe.product.id,
-              name: recipe.product.name
-            },
-            quantity: recipe.minBatchSize || 0,
-          })) || [],
-          estimatedTravelTime: 30,
-          status: 'new'
-        });
-      }
+      await onSubmit(orderData);
+      setSubmitSuccess(true);
+      // Don't reset the form - the modal will close
     } catch (error) {
       console.error('Error submitting order:', error);
-      setWarnings(['Failed to submit order. Please try again.', 'hii']);
-    
+      setWarnings(['Failed to submit order. Please try again.']);
     } finally {
       setIsSubmitting(false);
     }
@@ -152,9 +138,17 @@ const OrderForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">
-    
-    
+    <div className="w-full">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">Create New Order</h2>
+        <button
+          onClick={onCancel}
+          className="p-2 hover:bg-gray-100 rounded-full"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
       {submitSuccess && (
         <Alert variant="success" title="Success" className="mb-4">
           Order created successfully!
@@ -162,44 +156,12 @@ const OrderForm: React.FC = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-
-
-                  <div className="flex"> 
-
-            <div className="col-md-6">
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">Place New Order</h2>
-            </div>
-
-
-              {/* Submit Button */}
-            <div className="col-md-6">
-
-              <button
-              type="submit"
-              disabled={!isValid || isSubmitting}
-              className={`w-full py-2 px-4 rounded-md font-semibold transition-colors duration-200 ${
-                isValid && !isSubmitting
-                  ? 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              {isSubmitting ? 'Creating Order...' : 'Place Order'}
-            </button>
-            </div>
-
-            </div>
-
-
-
-
-
-
         {/* Customer Info */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Customer Name</label>
           <input
             type="text"
-            value="Pablo"//{formData.customerName}
+            value={formData.customerName}
             onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
@@ -309,7 +271,27 @@ const OrderForm: React.FC = () => {
             ))}
           </div>
         )}
-
+  {/* Footer with actions */}
+  <div className="flex justify-end space-x-4 mt-6 pt-4 border-t">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!isValid || isSubmitting}
+            className={`px-4 py-2 rounded-md font-semibold ${
+              isValid && !isSubmitting
+                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            {isSubmitting ? 'Creating...' : 'Create Order'}
+          </button>
+        </div>
      
       </form>
     </div>
