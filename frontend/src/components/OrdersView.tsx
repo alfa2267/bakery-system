@@ -139,11 +139,13 @@ const OrderView: React.FC = () => {
       case 'deliveryDate':
         comparison = new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime();
         break;
-      case 'id':
       case 'customerName':
       case 'deliverySlot':
       case 'location':
         comparison = a[sortField].localeCompare(b[sortField]);
+        break;
+      case 'id':
+        comparison = a[sortField] =  b[sortField];
         break;
       default:
         comparison = 0;
@@ -165,7 +167,6 @@ const OrderView: React.FC = () => {
     .filter(order => {
       const searchMatch = 
         order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.location.toLowerCase().includes(searchTerm.toLowerCase());
       
       const locationMatch = 

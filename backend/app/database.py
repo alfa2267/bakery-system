@@ -188,7 +188,7 @@ def create_default_data(session):
             {
                 "id": 1001,
                 "product_id": 23,
-                "requires_chilling": True,
+                "requires_chilling": False,
                 "max_chill_time": 240,
                 "min_batch_size": 3,
                 "max_batch_size": 12,

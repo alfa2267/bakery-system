@@ -27,6 +27,7 @@ const ListView: React.FC<ListViewProps> = ({ tasks, orders }) => {
             <th className="px-4 py-2 text-left font-medium">Start Time</th>
             <th className="px-4 py-2 text-left font-medium">End Time</th>
             <th className="px-4 py-2 text-left font-medium">Product</th>
+            <th className="px-4 py-2 text-left font-medium">Quantity</th>
             <th className="px-4 py-2 text-left font-medium">Status</th>
           </tr>
         </thead>
@@ -77,6 +78,11 @@ const ListView: React.FC<ListViewProps> = ({ tasks, orders }) => {
                   {/* Product */}
                   <td className="px-4 py-2">
                     {task.product?.name || "N/A"}
+                  </td>
+
+                  {/* Quantity */}
+                    <td className="px-4 py-2">
+                    {task.batchSize || "N/A"}
                   </td>
 
                   {/* Status */}

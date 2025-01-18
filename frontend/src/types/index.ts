@@ -2,7 +2,7 @@
 
 // Define the base task interface that matches Frappe Gantt's structure
 export interface BaseTask {
-  id: string;
+  id: number;
   name: string;
   start: string;
   end: string;
@@ -66,6 +66,8 @@ export interface Recipe {
   maxChillTime: number;
   minBatchSize: number;
   maxBatchSize: number;
+  maxStorageTime?: number; // Days products can be stored
+
   unit: string;
 }
 
@@ -76,7 +78,7 @@ export interface OrderItem {
 }
 
 export interface Order {
-  id: string;
+  id: number;
   customerName: string;
   deliveryDate: string;
   deliverySlot: string;
@@ -95,8 +97,8 @@ export type ProductionStep = 'mixing' | 'chilling' | 'shaping' | 'baking' | 'coo
 export type ViewMode = FrappeViewMode;
 
 export interface ScheduledTask {
-  id: string;
-  orderId: string;
+  id: number;
+  orderId: number;
   step: ProductionStep;
   startTime: Date;
   endTime: Date;
@@ -109,7 +111,7 @@ export interface ScheduledTask {
 }
 
 export interface Resource {
-  id: string;
+  id: number;
   name: string;
 }
 

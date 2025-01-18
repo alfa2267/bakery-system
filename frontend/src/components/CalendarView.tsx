@@ -146,7 +146,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
 
   const events = useMemo(() => {
     return tasks.map(task => ({
-      id: task.id,
+      id: str(task.id),
       title: `${task.product?.name || 'Unnamed'} (${task.orderId})`,
       start: task.startTime,
       end: task.endTime,
@@ -218,3 +218,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
 };
 
 export default CalendarView;
+
+function str(id: number): any {
+  throw new Error('Function not implemented.');
+}

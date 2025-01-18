@@ -17,9 +17,6 @@ import {
 import GanttView from './GanttView';
 import CalendarView from './CalendarView';
 import ListView from './ListView';
-import Gantt from 'frappe-gantt';
-
-
 
 
 const ScheduleView: React.FC = () => {

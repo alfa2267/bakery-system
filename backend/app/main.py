@@ -112,7 +112,7 @@ async def get_recipes(db: Session = Depends(get_db)):
                             "id": ing.product.id
                             },
                         "unit": ing.unit,
-                        "qty": str(ing.quantity),
+                        "qty": int(ing.quantity),
                         "id": ing.id
                     }
                     for ing in db_recipe.ingredients
@@ -357,7 +357,7 @@ async def update_task_timing(
         updated_task = repository.update_task_timing(task_id, timing.start, timing.end)
         
         return {
-            "id": str(updated_task.id),
+            "id":int(updated_task.id),
             "time": updated_task.start_time.isoformat(),
             "action": updated_task.step,
             "details": f"{updated_task.step} for Order {updated_task.order_id}",
@@ -383,7 +383,7 @@ async def update_task_status(
         updated_task = repository.update_task_status(task_id, status)
         
         return {
-            "id": str(updated_task.id),
+            "id": int(updated_task.id),
             "time": updated_task.start_time.isoformat(),
             "action": updated_task.step,
             "details": f"{updated_task.step} for Order {updated_task.order_id}",
@@ -411,6 +411,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/resources")
 async def get_resources(
+    id: Optional[int] = Query(None, description="ID of resource"),
     date: Optional[str] = Query(None, description="Date to check resources availability"),
     filter_name: Optional[str] = Query(None, description="Specific staff or equipment to filter"),
     filter_type: Optional[str] = Query(None, description="Type of resource to filter (staff/equipment)"),
@@ -430,7 +431,7 @@ async def get_resources(
             tasks = repository.get_tasks_by_date_and_resource(date, baker_name)
             resources['tasks'] = [
                 {
-                    "id": str(task.id),
+                    "id": int(task.id),
                     "time": task.start_time.isoformat(),
                     "action": task.step,
                     "details": f"{task.step} for Order {task.order_id}",

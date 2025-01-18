@@ -36,7 +36,7 @@ const GanttChart: React.FC<GanttViewProps> = ({
     // If tasks is empty, return placeholder tasks for all filtered steps
     if (tasks.length === 0) {
       return Array.from(filteredSteps).map((step) => ({
-        id: `placeholder-${step}`,
+        id: 0,
         name: `Placeholder ${step}`,
         start: new Date().toISOString(),
         end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -46,8 +46,8 @@ const GanttChart: React.FC<GanttViewProps> = ({
         y: 0,
         _data: { 
           originalTask: {
-            id: `placeholder-${step}`,
-            orderId: 'placeholder',
+            id: 0,
+            orderId: 0,
             step,
             startTime: new Date(),
             endTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -84,6 +84,7 @@ const GanttChart: React.FC<GanttViewProps> = ({
       return Object.entries(productGroups).map(([productName, productTasks]) => {
         const earliestStart = new Date(Math.min(...productTasks.map(t => new Date(t.startTime).getTime())));
         const latestEnd = new Date(Math.max(...productTasks.map(t => new Date(t.endTime).getTime())));
+        const pid = Number(productTasks.map(t => t.id));
         
         const totalProgress = productTasks.reduce((sum, task) => {
           const taskProgress = task.status === 'completed' ? 100 : 
@@ -105,7 +106,7 @@ const GanttChart: React.FC<GanttViewProps> = ({
         const order = orderMap[representativeTask.orderId];
 
         return {
-          id: `product-${productName}`,
+          id: pid,
           name: order 
             ? `${productName} (${order.customerName}) - ${stepDetails}`
             : `${productName}: ${stepDetails}`,
@@ -132,6 +133,7 @@ const GanttChart: React.FC<GanttViewProps> = ({
       }, {} as Record<ProductionStep, ScheduledTask[]>);
 
       return Object.entries(stepGroups).map(([step, stepTasks]) => {
+
         const earliestStart = new Date(Math.min(...stepTasks.map(t => new Date(t.startTime).getTime())));
         const latestEnd = new Date(Math.max(...stepTasks.map(t => new Date(t.endTime).getTime())));
         
@@ -157,7 +159,7 @@ const GanttChart: React.FC<GanttViewProps> = ({
         const representativeTask = stepTasks[0];
 
         return {
-          id: `step-${step}`,
+          id: representativeTask.id ,
           name: `${step}: ${productDetails}`,
           start: earliestStart.toISOString(),
           end: latestEnd.toISOString(),

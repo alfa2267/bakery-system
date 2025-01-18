@@ -43,7 +43,7 @@ class OrderItemDB(Base):
     __tablename__ = "order_items"
     
     id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(String, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     quantity = Column(Integer, nullable=False)
     
@@ -74,7 +74,7 @@ class RecipeIngredientDB(Base):
     recipe_id = Column(Integer, ForeignKey("recipes.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     quantity = Column(Float, nullable=False)
-    unit = Column(String, nullable=False)
+    unit = Column(Integer, nullable=False)
     
     product = relationship("ProductDB")  # Simplified relationship
     recipe = relationship("RecipeDB", back_populates="ingredients")
@@ -87,7 +87,7 @@ class RecipeDB(Base):
     max_chill_time = Column(Integer, nullable=False)
     min_batch_size = Column(Integer, nullable=False)
     max_batch_size = Column(Integer, nullable=False)
-    unit = Column(String, nullable=False)
+    unit = Column(Integer, nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)  # Add this line
     product = relationship("ProductDB", back_populates="recipes")
     steps = relationship("RecipeStepDB", back_populates="recipe", cascade="all, delete-orphan")
@@ -115,7 +115,7 @@ class ScheduledTaskDB(Base):
     __tablename__ = "scheduled_tasks"
     
     id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(String, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
     order_item_id = Column(Integer, ForeignKey("order_items.id", ondelete="CASCADE"), nullable=False)
     step = Column(String, nullable=False)
     start_time = Column(DateTime, nullable=False, default=datetime.utcnow)

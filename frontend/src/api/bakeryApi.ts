@@ -164,7 +164,7 @@ export const bakeryApi = {
     return handleResponse<ScheduleResponse>(response);
   },
 
-  updateTaskTiming: async (taskId: string, start: Date, end: Date): Promise<void> => {
+  updateTaskTiming: async (taskId: number, start: Date, end: Date): Promise<void> => {
     const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/timing`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -176,7 +176,7 @@ export const bakeryApi = {
     await handleResponse<void>(response);
   },
 
-  updateTaskStatus: async (taskId: string, status: TaskStatus): Promise<void> => {
+  updateTaskStatus: async (taskId: number, status: TaskStatus): Promise<void> => {
     const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/status`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

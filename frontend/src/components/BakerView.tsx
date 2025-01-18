@@ -41,7 +41,7 @@ const BakerView: React.FC<BakerViewProps> = ({ selectedBaker }) => {
     fetchTasks();
   }, [selectedDate, selectedBaker]);
 
-  const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+  const handleStatusChange = async (taskId: number, newStatus: TaskStatus) => {
     try {
       // Optimistic update
       const updatedTasks = tasks.map(task => 
