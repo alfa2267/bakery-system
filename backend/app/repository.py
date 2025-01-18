@@ -282,15 +282,39 @@ class RecipeRepository:
         self.db = db
 
     def get_recipe_by_id(self, recipe_id: int) -> Optional[models.RecipeDB]:
-        """Get a specific recipe by ID"""
-        return self.db.query(models.RecipeDB)\
-            .options(
-                joinedload(models.RecipeDB.product),
-                joinedload(models.RecipeDB.steps),
-                joinedload(models.RecipeDB.ingredients)
-            )\
-            .filter(models.RecipeDB.id == recipe_id)\
-            .first()
+        """Get a specific recipe by ID with all its relationships loaded"""
+        try:
+            # First do a simple check if recipe exists
+            logger.debug(f"Checking existence of recipe with ID: {recipe_id}")
+            recipe_exists = self.db.query(models.RecipeDB.id)\
+                .filter(models.RecipeDB.id == recipe_id)\
+                .scalar()
+                
+            if not recipe_exists:
+                logger.error(f"Recipe with ID {recipe_id} not found")
+                raise HTTPException(status_code=404, detail=f"Recipe with ID {recipe_id} not found")
+            
+            # If recipe exists, fetch with all relationships
+            logger.debug(f"Fetching complete recipe data for ID: {recipe_id}")
+            recipe = self.db.query(models.RecipeDB)\
+                .options(
+                    joinedload(models.RecipeDB.product),
+                    joinedload(models.RecipeDB.steps),
+                    joinedload(models.RecipeDB.ingredients).joinedload(models.RecipeIngredientDB.product)
+                )\
+                .filter(models.RecipeDB.id == recipe_id)\
+                .first()
+                
+            return recipe
+
+        except HTTPException:
+            raise
+        except SQLAlchemyError as e:
+            logger.error(f"Database error fetching recipe with ID {recipe_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+
 
     def get_recipe_by_product(self, product_id: int) -> Optional[models.RecipeDB]:
         """Get recipe for a specific product"""
@@ -368,6 +392,7 @@ class RecipeRepository:
                     unit=ing_data.unit
                 )
                 self.db.add(ingredient)
+                self.db.flush()  # Add this line to ensure proper ID generation
 
             # Create steps
             for index, step_data in enumerate(recipe_data.steps):
@@ -406,14 +431,6 @@ class RecipeRepository:
             logger.error(f"Unexpected error creating recipe: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Unexpected error creating recipe: {str(e)}")
     
-
-
-
-
-
-
-        
-
     def update_recipe(self, recipe_id: int, recipe_data: Dict) -> models.RecipeDB:
         """Update an existing recipe"""
         try:
@@ -477,15 +494,43 @@ class RecipeRepository:
     def delete_recipe(self, recipe_id: int) -> bool:
         """Delete a recipe"""
         try:
-            recipe = self.get_recipe_by_id(recipe_id)
-            if not recipe:
-                raise HTTPException(status_code=404, detail="Recipe not found")
+            logger.debug(f"Attempting to delete recipe with ID: {recipe_id}")
+            
+            # First check if recipe exists
+            recipe_exists = self.db.query(models.RecipeDB.id)\
+                .filter(models.RecipeDB.id == recipe_id)\
+                .scalar()
+                
+            if not recipe_exists:
+                logger.error(f"Cannot delete - recipe with ID {recipe_id} not found")
+                raise HTTPException(status_code=404, detail=f"Recipe with ID {recipe_id} not found")
 
-            self.db.delete(recipe)
+            # Delete related records first
+            logger.debug(f"Deleting related records for recipe {recipe_id}")
+            
+            # Delete ingredients
+            self.db.query(models.RecipeIngredientDB)\
+                .filter(models.RecipeIngredientDB.recipe_id == recipe_id)\
+                .delete(synchronize_session=False)
+                
+            # Delete steps
+            self.db.query(models.RecipeStepDB)\
+                .filter(models.RecipeStepDB.recipe_id == recipe_id)\
+                .delete(synchronize_session=False)
+                
+            # Delete the recipe itself
+            deleted = self.db.query(models.RecipeDB)\
+                .filter(models.RecipeDB.id == recipe_id)\
+                .delete(synchronize_session=False)
+                
             self.db.commit()
+            
+            logger.info(f"Successfully deleted recipe {recipe_id} and all related records")
             return True
 
+        except HTTPException:
+            raise
         except SQLAlchemyError as e:
             self.db.rollback()
-            logger.error(f"Error deleting recipe: {str(e)}")
-            raise HTTPException(status_code=500, detail="Error deleting recipe")
+            logger.error(f"Database error deleting recipe {recipe_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Database error while deleting recipe: {str(e)}")

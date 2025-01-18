@@ -172,6 +172,51 @@ async def create_recipe(
 
 
 
+
+@app.put("/recipes/{recipes_id}", response_model=Recipe)
+async def update_recipe(
+    recipe_id: int,
+    recipe: Recipe,
+    db: Session = Depends(get_db)
+):
+    """Update an existing recipe"""
+    try:
+        repository = RecipeRepository(db)
+        db_recipe = repository.update_recipe(recipe_id, recipe)
+        if not db_recipe:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        return db_recipe
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating recipe: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not update recipe: {str(e)}"
+        )
+
+
+@app.delete("/recipes/{recipe_id}")
+async def delete_recipe(recipe_id: int, db: Session = Depends(get_db)):
+    """Delete a recipe"""
+    try:
+        repository = RecipeRepository(db)
+        success = repository.delete_recipe(recipe_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting recipe: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not delete recipe: {str(e)}"
+        )
+
+
 @app.post("/orders/validate")
 async def validate_order(
     order: Order,
@@ -186,6 +231,7 @@ async def validate_order(
         logger.error(f"Error during order validation: {str(e)}")
         logger.error(traceback.format_exc())
         return ValidationResponse(isValid=False, warnings=[f"Validation error: {str(e)}"])
+
 
 @app.post("/orders")
 async def create_order(

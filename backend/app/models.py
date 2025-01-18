@@ -51,9 +51,9 @@ class RecipeStepDB(Base):
 class RecipeIngredientDB(Base):
     __tablename__ = "recipe_ingredients"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     recipe_id = Column(Integer, ForeignKey("recipes.id"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)  # Add this
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     quantity = Column(Float, nullable=False)
     unit = Column(String, nullable=False)
     
@@ -63,7 +63,7 @@ class RecipeIngredientDB(Base):
 class RecipeDB(Base):
     __tablename__ = "recipes"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     requires_chilling = Column(Boolean, nullable=False)
     max_chill_time = Column(Integer, nullable=False)
     min_batch_size = Column(Integer, nullable=False)
@@ -73,6 +73,7 @@ class RecipeDB(Base):
     product = relationship("ProductDB", back_populates="recipes")
     steps = relationship("RecipeStepDB", back_populates="recipe", cascade="all, delete-orphan")
     ingredients = relationship("RecipeIngredientDB", back_populates="recipe", cascade="all, delete-orphan")
+    
 
 class OrderDB(Base):
     __tablename__ = "orders"
