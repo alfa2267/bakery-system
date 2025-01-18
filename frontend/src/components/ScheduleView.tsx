@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { bakeryApi } from '../api/bakeryApi';
 import Select, { ActionMeta, MultiValue } from 'react-select';
-import { Calendar, ChevronLeft, ChevronRight, List } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, GanttChartIcon, List } from 'lucide-react';
 import { Alert } from '../ui/Alert';
 import { 
   ScheduledTask, 
@@ -17,6 +17,7 @@ import {
 import GanttView from './GanttView';
 import CalendarView from './CalendarView';
 import ListView from './ListView';
+import Gantt from 'frappe-gantt';
 
 
 
@@ -270,6 +271,12 @@ const NavButton: React.FC<{
          <div className="flex items-center space-x-4">
             {/* View Type change */}
             <div className="flex items-center space-x-2">
+            <NavButton 
+                mode="gantt" 
+                icon={<GanttChartIcon className="w-4 h-4" />} 
+                label="Gantt" 
+                onClick={setViewMode}
+              />
               <NavButton 
                 mode="calendar" 
                 icon={<Calendar className="w-4 h-4" />} 
@@ -358,7 +365,7 @@ const NavButton: React.FC<{
   />
   
   }
-        <GanttView 
+    { viewMode === 'gantt' &&    <GanttView 
           tasks={filteredTasks} 
           orders={orders}
           viewMode={currentView}
@@ -367,6 +374,7 @@ const NavButton: React.FC<{
           onProgressChange={handleProgressChange}
           onDateChange={handleDateChange}
         />
+        }
       </div>
     </div>
   );

@@ -4,6 +4,8 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, Float, ForeignKey, DateTime, JSON
 from sqlalchemy.orm import relationship
 import uuid
+from sqlalchemy import CheckConstraint
+from datetime import datetime, timedelta
 
 from .database import Base
 
@@ -107,6 +109,8 @@ class OrderDB(Base):
     items = relationship("OrderItemDB", back_populates="order", cascade="all, delete-orphan")
     tasks = relationship("ScheduledTaskDB", back_populates="order", cascade="all, delete-orphan")
 
+
+
 class ScheduledTaskDB(Base):
     __tablename__ = "scheduled_tasks"
     
@@ -114,14 +118,20 @@ class ScheduledTaskDB(Base):
     order_id = Column(String, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
     order_item_id = Column(Integer, ForeignKey("order_items.id", ondelete="CASCADE"), nullable=False)
     step = Column(String, nullable=False)
-    start_time = Column(DateTime, nullable=False)
-    end_time = Column(DateTime, nullable=False)
-    resources = Column(JSON, nullable=False)
-    batch_size = Column(Integer, nullable=False)
+    start_time = Column(DateTime, nullable=False, default=datetime.utcnow)
+    end_time = Column(DateTime, nullable=False, default=lambda: datetime.utcnow() + timedelta(hours=1))
+    resources = Column(JSON, nullable=False, default=list)  # Empty list as default
+    batch_size = Column(Integer, nullable=False, default=1)
     status = Column(String, nullable=False, default='pending')
     
     order = relationship("OrderDB", back_populates="tasks")
     order_item = relationship("OrderItemDB", back_populates="tasks")
+
+    __table_args__ = (
+        # Add a check constraint to ensure end_time is after start_time
+        CheckConstraint('end_time > start_time', name='check_end_time_after_start_time'),
+    )
+
 
 # Pydantic Models
 class Product(BaseModel):

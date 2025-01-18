@@ -287,7 +287,7 @@ export interface GanttChartProps {
 
 export type SortField = 'id' | 'customerName' | 'deliveryDate' | 'deliverySlot' | 'location';
 export type SortDirection = 'asc' | 'desc';
-export type ScreenViewMode =  'manager' | 'baker1' | 'baker2' | 'orders' | 'recipes' | 'products' | 'list' | 'calendar';
+export type ScreenViewMode =  'manager' | 'baker1' | 'baker2' | 'orders' | 'recipes' | 'products' | 'list' | 'calendar' | 'gantt';
 
 export type GroupingMode = 'step' | 'product';
 

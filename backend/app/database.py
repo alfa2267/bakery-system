@@ -49,7 +49,7 @@ def get_db():
 
 def create_default_data(session):
     """Create default products and recipes in the database"""
-    from .models import ProductDB, RecipeDB, RecipeStepDB, RecipeIngredientDB, ResourceDB, EquipmentDB, OrderDB, OrderItemDB
+    from .models import ProductDB, RecipeDB, RecipeStepDB, RecipeIngredientDB, ResourceDB, EquipmentDB, OrderDB, OrderItemDB, ScheduledTaskDB
     
     # Check if data already exists
     if session.query(ProductDB).first() or session.query(ResourceDB).first() or session.query(EquipmentDB).first() or session.query(OrderDB).first():
@@ -320,6 +320,81 @@ def create_default_data(session):
                 )
                 session.add(order_item)
 
+        
+        # After creating orders and order items, add scheduled tasks
+        orders = session.query(OrderDB).all()
+        
+        # Sort orders by delivery date and time
+        orders.sort(key=lambda x: f"{x.delivery_date} {x.delivery_slot.split('-')[0]}")
+        
+        # Track resource utilization
+        resource_schedule = []  # List of (start_time, end_time) tuples
+        
+        for order in orders:
+            order_items = session.query(OrderItemDB).filter(OrderItemDB.order_id == order.id).all()
+            
+            for order_item in order_items:
+                recipe = session.query(RecipeDB).filter(RecipeDB.product_id == order_item.product_id).first()
+                if recipe:
+                    steps = session.query(RecipeStepDB).filter(RecipeStepDB.recipe_id == recipe.id).order_by(RecipeStepDB.order).all()
+                    
+                    # Calculate delivery datetime
+                    delivery_slot_start = order.delivery_slot.split('-')[0]
+                    delivery_datetime = datetime.strptime(f"{order.delivery_date} {delivery_slot_start}", "%Y-%m-%d %H:%M")
+                    
+                    # Calculate total time needed
+                    total_duration = sum(step.duration for step in steps)
+                    buffer_time = (len(steps) - 1) * 15  # 15-minute buffer between steps
+                    
+                    # Find a suitable starting time
+                    latest_start = delivery_datetime - timedelta(minutes=total_duration + buffer_time)
+                    current_time = latest_start - timedelta(hours=12)  # Start trying from 12 hours before deadline
+                    
+                    def find_available_slot(start_time, duration):
+                        """Find the next available time slot that doesn't overlap with existing tasks"""
+                        current = start_time
+                        while True:
+                            end_time = current + timedelta(minutes=duration)
+                            # Check for overlaps
+                            overlaps = False
+                            for scheduled_start, scheduled_end in resource_schedule:
+                                if not (end_time <= scheduled_start or current >= scheduled_end):
+                                    overlaps = True
+                                    current = scheduled_end + timedelta(minutes=15)  # Try after this task
+                                    break
+                            if not overlaps:
+                                return current
+                    
+                    # Schedule each step
+                    for step in steps:
+                        # Find the next available time slot
+                        start_time = find_available_slot(current_time, step.duration)
+                        end_time = start_time + timedelta(minutes=step.duration)
+                        
+                        # Create the task
+                        scheduled_task = ScheduledTaskDB(
+                            order_id=order.id,
+                            order_item_id=order_item.id,
+                            step=step.name.lower(),
+                            start_time=start_time,
+                            end_time=end_time,
+                            resources=["Crubby"],
+                            batch_size=min(order_item.quantity, recipe.max_batch_size),
+                            status='pending'
+                        )
+                        session.add(scheduled_task)
+                        
+                        # Add to resource schedule
+                        resource_schedule.append((start_time, end_time))
+                        resource_schedule.sort(key=lambda x: x[0])  # Keep schedule sorted
+                        
+                        # Update current_time for next step
+                        current_time = end_time + timedelta(minutes=15)  # 15-minute buffer
+                                                
+            session.flush()
+        
+        
+        
         session.commit()
         logger.info("Default data created successfully")
         

@@ -21,9 +21,9 @@ const ListView: React.FC<ListViewProps> = ({ tasks, orders }) => {
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b">
+            <th className="px-4 py-2 text-left font-medium">Task Id</th>
             <th className="px-4 py-2 text-left font-medium">Step</th>
-            <th className="px-4 py-2 text-left font-medium">Order ID</th>
-            <th className="px-4 py-2 text-left font-medium">Customer Name</th>
+            <th className="px-4 py-2 text-left font-medium">Resource</th>
             <th className="px-4 py-2 text-left font-medium">Start Time</th>
             <th className="px-4 py-2 text-left font-medium">End Time</th>
             <th className="px-4 py-2 text-left font-medium">Product</th>
@@ -39,7 +39,13 @@ const ListView: React.FC<ListViewProps> = ({ tasks, orders }) => {
                   key={task.id} 
                   className="border-b hover:bg-gray-50"
                 >
+
+
+                  {/* Task ID */}
+                  <td className="px-4 py-2">{task.id}</td>
+
                   {/* Step with color indicator */}
+
                   <td className="px-4 py-2">
                     <div className="flex items-center space-x-2">
                       <span 
@@ -49,12 +55,9 @@ const ListView: React.FC<ListViewProps> = ({ tasks, orders }) => {
                     </div>
                   </td>
 
-                  {/* Order ID */}
-                  <td className="px-4 py-2">{task.orderId}</td>
-
                   {/* Customer Name */}
                   <td className="px-4 py-2">
-                    {order?.customerName || "N/A"}
+                    {task.resources.join(',') || "N/A"}
                   </td>
 
                   {/* Start Time */}
