@@ -4,7 +4,10 @@ import Select, { ActionMeta, MultiValue } from 'react-select';
 import { 
   ChevronLeft, 
   ChevronRight, 
-  BarChart2
+  BarChart2,
+  Calendar1Icon,
+  GanttChartIcon,
+  ListIcon
 } from 'lucide-react';
 import { Alert } from '../ui/Alert';
 import Gantt from 'frappe-gantt';
@@ -48,6 +51,8 @@ const GanttChart: React.FC<ExtendedGanttChartProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const ganttRef = useRef<any>(null);
 
+    
+  
   const transformToGanttTasks = useCallback((tasks: ScheduledTask[]): GanttTask[] => {
     // If tasks is empty, return placeholder tasks for all filtered steps
     if (tasks.length === 0) {
@@ -196,6 +201,7 @@ const GanttChart: React.FC<ExtendedGanttChartProps> = ({
   }, [filteredSteps, groupingMode]);
 
   useEffect(() => {
+
     if (!containerRef.current || tasks.length === 0) return;
 
     containerRef.current.innerHTML = '';
@@ -290,8 +296,23 @@ const GanttChart: React.FC<ExtendedGanttChartProps> = ({
       }).join('\n')}
     `;
     document.head.appendChild(style);
+    console.log("hi!!")
 
-    // Rest of the existing code...
+    const gridBody = ganttContainer.querySelector('.grid-body');
+    const timelineBody = ganttContainer.querySelector('.timeline-body');
+    
+    if (gridBody && timelineBody) {
+      gridBody.addEventListener('scroll', () => {
+        timelineBody.scrollTop = gridBody.scrollTop;
+      });
+      
+      timelineBody.addEventListener('scroll', () => {
+        gridBody.scrollTop = timelineBody.scrollTop;
+      });
+    }
+
+    const currentContainer = containerRef.current;
+   
 
     return () => {
       style.remove();
@@ -324,7 +345,7 @@ const GanttView: React.FC = () => {
   const [showResourceUtilization, setShowResourceUtilization] = useState(false);
   const [filteredSteps, setFilteredSteps] = useState<Set<ProductionStep>>(new Set(PRODUCTION_STEPS));
   const [utilization, setUtilization] = useState<any>(null);
-  
+
 
   const stepOptions: StepOption[] = PRODUCTION_STEPS.map(step => ({
     value: step,
@@ -428,6 +449,26 @@ return (
 
         {/* Core Controls */}
         <div className="flex items-center space-x-3">
+         
+         {/* View Type change */}
+         <button
+            onClick={() => 0} 
+            className={'px-4 py-2 rounded-lg flex items-center space-x-2 bg-gray-100 hover:bg-gray-200'}>
+            <Calendar1Icon></Calendar1Icon> <span>Calendar</span> 
+         </button>
+         <button
+            onClick={() => 0} 
+            className={'px-4 py-2 rounded-lg flex items-center space-x-2 bg-gray-100 hover:bg-gray-200'}>
+            <ListIcon></ListIcon> <span>List</span> 
+         </button>
+         <button
+            onClick={() => 0} 
+            className={'px-4 py-2 rounded-lg flex items-center space-x-2 bg-gray-100 hover:bg-gray-200'}>
+            <GanttChartIcon></GanttChartIcon> <span>Gantt</span> 
+         </button>
+         
+         
+         
           {/* Grouping Mode Selector */}
           <div className="flex items-center space-x-2">
             <select
