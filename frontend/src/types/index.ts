@@ -50,6 +50,7 @@ export interface Step {
   name: ProductionStep;
   duration: number;
   requiresHuman: boolean;
+  equipment: Resource[]
   requiresOven: boolean;
   requiresMixer: boolean;
   mustFollowImmediately: boolean;
@@ -318,4 +319,14 @@ export interface RecipeFormProps {
   initialRecipe?: Recipe;
   onSubmit: (recipe: Recipe) => void;
   onCancel: () => void;
+}
+
+export interface Option {
+  value: number;
+  label: string;
+}
+// Error Handler Component Props
+export interface RecipeErrorHandlerProps {
+  error: ValidationError | string | null;
+  onDismiss: () => void;
 }

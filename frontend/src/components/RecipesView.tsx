@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { bakeryApi } from '../api/bakeryApi';
 import { Recipe, Step, Ingredient, ProductionStep, PRODUCTION_STEPS, Product, ValidationError, RecipeFormProps } from '../types';
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp, X, Minus } from 'lucide-react';
-import { Alert, AlertDialogDescription, AlertDialogTitle } from '../ui/Alert';
-import { NullLiteral } from 'typescript';
+import RecipeForm from './RecipeForm';
 
 // UI Components
 const Card = ({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
@@ -24,37 +23,7 @@ const CardContent = ({ children, className, ...props }: React.HTMLAttributes<HTM
   <div className={`p-6 pt-0 ${className}`} {...props}>{children}</div>
 );
 
-// Error Handler Component
-interface RecipeErrorHandlerProps {
-  error: ValidationError | string | null;
-  onDismiss: () => void;
-}
 
-const RecipeErrorHandler: React.FC<RecipeErrorHandlerProps> = ({ error, onDismiss }) => {
-  if (!error) return null;
-
-  const errorMessage = typeof error === 'string' 
-    ? error 
-    : error.detail?.[0]?.msg || error.message || 'An unexpected error occurred';
-
-  return (
-    <Alert variant="error" className="mb-4">
-      <AlertDialogTitle className="flex items-center justify-between">
-        Error
-        <button 
-          type="button" 
-          onClick={onDismiss} 
-          className="text-gray-500 hover:text-gray-700"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </AlertDialogTitle>
-      <AlertDialogDescription>
-        {errorMessage}
-      </AlertDialogDescription>
-    </Alert>
-  );
-};
 
 const Button = ({
   children,
@@ -181,460 +150,6 @@ const RecipeCard: React.FC<{
   );
 };
 
-const emptyStep: Step = {
-  id: 0,
-  name: '' as ProductionStep,
-  duration: 0,
-  requiresHuman: false,
-  requiresOven: false,
-  requiresMixer: false,
-  mustFollowImmediately: false,
-  scalingFactor: 1.0
-};
-
-const emptyIngredient: Ingredient = {
-  product: {
-    name: '',
-    id: 0
-  },
-  unit: '',
-  qty: 0
-};
-
-const emptyProduct: Product = {
-  name: '',
-  id: 0
-};
-
-
-const RecipeForm: React.FC<RecipeFormProps> = ({
-  initialRecipe,
-  onSubmit,
-  onCancel
-}) => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<ValidationError | string | null>(null);
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const response = await bakeryApi.getProducts();
-      setProducts(response);
-    } catch (err) {
-      console.error('Error fetching products:', err);
-      setError('Failed to fetch products. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  
-  
-  // In RecipeForm, update the formData state initialization
-const [formData, setFormData] = useState<Recipe>(() => {
-  if (initialRecipe) {
-    return { ...initialRecipe };
-  }
-  return {
-    id: 0, // Add a default id for new recipes
-    product: { ...emptyProduct },
-    ingredients: [{ ...emptyIngredient }],
-    steps: [{ ...emptyStep }],
-    requiresChilling: false,
-    maxChillTime: 0,
-    minBatchSize: 1,
-    maxBatchSize: 50,
-    unit: 'pieces'
-  };
-});
-
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      onSubmit(formData as Recipe);
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unexpected error occurred');
-      }
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">
-          {initialRecipe ? 'Edit Recipe' : 'Create New Recipe'}
-        </h2>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-gray-500 hover:text-gray-700"
-        >
-          <X className="h-5 w-5" />
-        </button>
-      </div>
-
-      <RecipeErrorHandler 
-        error={error} 
-        onDismiss={() => setError(null)} 
-      />
-
-            <div className="space-y-4">
-        {/* Product Information */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Product Name</label>
-          <select
-            key={formData.product.id}
-            value={formData.product.id}
-            onChange={e => {
-              setFormData({
-                ...formData,
-                product: {
-                  id: Number(e.target.value),
-                  name: products[e.target.selectedIndex].name
-                }
-              });
-            }}
-            className="w-full px-3 py-2 border rounded-md"
-            required
-          >
-            {products.map(product => (
-              <option key={product.id} value={product.id}>
-                {product.name.charAt(0).toUpperCase() + product.name.slice(1)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Batch Size Settings */}
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Min Batch</label>
-            <input
-              type="number"
-              value={formData.minBatchSize}
-              onChange={e => setFormData({
-                ...formData,
-                minBatchSize: parseInt(e.target.value)
-              })}
-              className="w-full px-3 py-2 border rounded-md"
-              min="1"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Max Batch</label>
-            <input
-              type="number"
-              value={formData.maxBatchSize}
-              onChange={e => setFormData({
-                ...formData,
-                maxBatchSize: parseInt(e.target.value)
-              })}
-              className="w-full px-3 py-2 border rounded-md"
-              min={formData.minBatchSize}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Unit</label>
-            <select
-              value={formData.unit}
-              onChange={e => setFormData({ ...formData, unit: e.target.value })}
-              className="w-full px-3 py-2 border rounded-md"
-              required
-            >
-              <option value="pieces">Pieces</option>
-              <option value="loaves">Loaves</option>
-              <option value="kg">Kilograms</option>
-              <option value="dozen">Dozen</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Ingredients */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <label className="text-sm font-medium">Ingredients</label>
-            <button
-              type="button"
-              onClick={() => setFormData({
-                ...formData,
-                ingredients: [...formData.ingredients, { ...emptyIngredient }]
-              })}
-              className="text-blue-500 hover:text-blue-600"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="space-y-2">
-            {formData.ingredients.map((ingredient, index) => (
-              <div key={index} className="flex gap-2">
-                <select
-                  value={ingredient.product.id}
-                  onChange={e => {
-                    const newIngredients = [...formData.ingredients];
-                    newIngredients[index] = {
-                      ...ingredient,
-                      product: {
-                        id: Number(e.target.value),
-                        name: products[e.target.selectedIndex].name
-                      }
-                    };
-                    setFormData({ ...formData, ingredients: newIngredients });
-                  }}
-                  className="w-full px-3 py-2 border rounded-md"
-                  required
-                >
-                  {products.map(product => (
-                    <option key={product.id} value={product.id}>
-                      {product.name.charAt(0).toUpperCase() + product.name.slice(1)}
-                    </option>
-                  ))}
-                </select>
-
-                <input
-                  type="text"
-                  placeholder="Quantity"
-                  value={ingredient.qty}
-                  onChange={e => {
-                    const newIngredients = [...formData.ingredients];
-                    newIngredients[index] = {
-                      ...ingredient,
-                      qty: Number(e.target.value)
-                    };
-                    setFormData({ ...formData, ingredients: newIngredients });
-                  }}
-                  className="w-24 px-3 py-2 border rounded-md"
-                  required
-                />
-                <input
-                  type="text"
-                  placeholder="Unit"
-                  value={ingredient.unit}
-                  onChange={e => {
-                    const newIngredients = [...formData.ingredients];
-                    newIngredients[index] = {
-                      ...ingredient,
-                      unit: e.target.value
-                    };
-                    setFormData({ ...formData, ingredients: newIngredients });
-                  }}
-                  className="w-24 px-3 py-2 border rounded-md"
-                  required
-                />
-                {formData.ingredients.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newIngredients = formData.ingredients.filter((_, i) => i !== index);
-                      setFormData({ ...formData, ingredients: newIngredients });
-                    }}
-                    className="text-red-500 hover:text-red-600"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Production Steps */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <label className="text-sm font-medium">Production Steps</label>
-            <button
-              type="button"
-              onClick={() => setFormData({
-                ...formData,
-                steps: [...formData.steps, { ...emptyStep }]
-              })}
-              className="text-blue-500 hover:text-blue-600"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-          {formData.steps.map((step, index) => (
-            <div key={index} className="p-4 border rounded-md">
-              <div className="flex justify-between mb-2">
-                <span className="font-medium">Step {index + 1}</span>
-                {formData.steps.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newSteps = formData.steps.filter((_, i) => i !== index);
-                      setFormData({ ...formData, steps: newSteps });
-                    }}
-                    className="text-red-500 hover:text-red-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <select
-                    value={step.name}
-                    onChange={e => {
-                      const newSteps = [...formData.steps];
-                      newSteps[index] = {
-                        ...step,
-                        name: e.target.value as ProductionStep
-                      };
-                      setFormData({ ...formData, steps: newSteps });
-                    }}
-                    className="w-full px-3 py-2 border rounded-md"
-                    required
-                  >
-                    {PRODUCTION_STEPS.map(stepType => (
-                      <option key={stepType} value={stepType}>
-                        {stepType.charAt(0).toUpperCase() + stepType.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <input
-                    type="number"
-                    placeholder="Duration (minutes)"
-                    value={step.duration}
-                    onChange={e => {
-                      const newSteps = [...formData.steps];
-                      newSteps[index] = { ...step, duration: parseInt(e.target.value) };
-                      setFormData({ ...formData, steps: newSteps });
-                    }}
-                    className="w-full px-3 py-2 border rounded-md"
-                    min="0"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mt-2">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={step.requiresHuman}
-                    onChange={e => {
-                      const newSteps = [...formData.steps];
-                      newSteps[index] = { ...step, requiresHuman: e.target.checked };
-                      setFormData({ ...formData, steps: newSteps });
-                    }}
-                    className="mr-2"
-                  />
-                  <label className="text-sm">Requires Staff</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={step.requiresOven}
-                    onChange={e => {
-                      const newSteps = [...formData.steps];
-                      newSteps[index] = { ...step, requiresOven: e.target.checked };
-                      setFormData({ ...formData, steps: newSteps });
-                    }}
-                    className="mr-2"
-                  />
-                  <label className="text-sm">Requires Oven</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={step.requiresMixer}
-                    onChange={e => {
-                      const newSteps = [...formData.steps];
-                      newSteps[index] = { ...step, requiresMixer: e.target.checked };
-                      setFormData({ ...formData, steps: newSteps });
-                    }}
-                    className="mr-2"
-                  />
-                  <label className="text-sm">Requires Mixer</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={step.mustFollowImmediately}
-                    onChange={e => {
-                      const newSteps = [...formData.steps];
-                      newSteps[index] = {
-                        ...step,
-                        mustFollowImmediately: e.target.checked
-                      };
-                      setFormData({ ...formData, steps: newSteps });
-                    }}
-                    className="mr-2"
-                  />
-                  <label className="text-sm">Must Follow Immediately</label>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Chilling Requirements */}
-        <div className="space-y-2">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              checked={formData.requiresChilling}
-              onChange={e => setFormData({
-                ...formData,
-                requiresChilling: e.target.checked ? true : false
-              })}
-              className="mr-2"
-            />
-            <label className="text-sm font-medium">Requires Chilling</label>
-          </div>
-          {formData.requiresChilling && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Max Chill Time (hours)</label>
-              <input
-                type="number"
-                value={formData.maxChillTime}
-                onChange={e => setFormData({
-                  ...formData,
-                  maxChillTime: parseInt(e.target.value)
-                })}
-                className="w-full px-3 py-2 border rounded-md"
-                min="0"
-                required
-              />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Form Actions */}
-      <div className="flex justify-end gap-4 pt-4 border-t">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 text-gray-600 hover:text-gray-800"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-        >
-          {initialRecipe ? 'Update Recipe' : 'Create Recipe'}
-        </button>
-      </div>
-    </form>
-  );
-};
-
 // Main RecipesView Component
 const RecipesView: React.FC = () => {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -670,39 +185,35 @@ const RecipesView: React.FC = () => {
     setIsFormOpen(true);
   };
 
-
-  // In RecipesView.tsx, modify handleFormSubmit:
-const handleFormSubmit = async (recipe: Recipe) => {
-  try {
-    setLoading(true);
-    setError(null);
-    
-    if (selectedRecipe?.id) {
-      // Update existing recipe - pass the recipe directly
-      const updatedRecipe = await bakeryApi.updateRecipe(selectedRecipe.id, recipe);
-      setRecipes(recipes.map(r => r.id === updatedRecipe.id ? updatedRecipe : r));
-    } else {
-      // Create new recipe
-      const newRecipe = await bakeryApi.createRecipe(recipe);
-      setRecipes([...recipes, newRecipe]);
+  const handleFormSubmit = async (recipe: Recipe) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      if (selectedRecipe?.id) {
+        // Update existing recipe
+        const updatedRecipe = await bakeryApi.updateRecipe(selectedRecipe.id, recipe);
+        setRecipes(recipes.map(r => r.id === updatedRecipe.id ? updatedRecipe : r));
+      } else {
+        // Create new recipe
+        const newRecipe = await bakeryApi.createRecipe(recipe);
+        setRecipes([...recipes, newRecipe]);
+      }
+      setIsFormOpen(false);
+    } catch (err: unknown) {
+      console.error('Error saving recipe:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else if (typeof err === 'object' && err !== null && 'response' in err) {
+        const apiError = err as { response: { data: ValidationError } };
+        setError(apiError.response.data);
+      } else {
+        setError('Failed to save recipe. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
-    setIsFormOpen(false);
-  } catch (err: unknown) {
-    console.error('Error saving recipe:', err);
-    if (err instanceof Error) {
-      setError(err.message);
-    } else if (typeof err === 'object' && err !== null && 'response' in err) {
-      const apiError = err as { response: { data: ValidationError } };
-      setError(apiError.response.data);
-    } else {
-      setError('Failed to save recipe. Please try again.');
-    }
-  } finally {
-    setLoading(false);
-  }
-};
-
-
+  };
 
   const handleDelete = async (recipeId: number | undefined) => {
     if (!recipeId) return;
@@ -721,14 +232,22 @@ const handleFormSubmit = async (recipe: Recipe) => {
     }
   };
 
+  // Render loading state
   if (loading && !isFormOpen) {
-    return <div className="flex justify-center items-center h-64">Loading recipes...</div>;
+    return (
+      <div className="flex justify-center items-center h-64">
+        <p className="text-gray-500">Loading recipes...</p>
+      </div>
+    );
   }
 
+  // Render error state
   if (error && !recipes.length) {
-    return <div className="text-red-500 p-4">{
-      typeof error === 'string' ? error : error.message || 'An error occurred'
-    }</div>;
+    return (
+      <div className="text-red-500 p-4">
+        {typeof error === 'string' ? error : error.message || 'An error occurred'}
+      </div>
+    );
   }
 
   return (
@@ -742,31 +261,37 @@ const handleFormSubmit = async (recipe: Recipe) => {
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {recipes.map((recipe) => (
-              <RecipeCard
-                key={recipe.id}
-                recipe={recipe}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
+          {recipes.length > 0 ? (
+            <div className="space-y-4">
+              {recipes.map((recipe) => (
+                <RecipeCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-gray-500 py-8">
+              No recipes found. Click "Add New Recipe" to get started.
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Recipe Form Dialog */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4">
-            <RecipeForm
-              initialRecipe={selectedRecipe}
-              onSubmit={handleFormSubmit}
-              onCancel={() => setIsFormOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4">
+      <RecipeForm
+        initialRecipe={selectedRecipe}  // This should now match the prop interface
+        onSubmit={handleFormSubmit}
+        onCancel={() => setIsFormOpen(false)}
+      />
+    </div>
+  </div>
+)}
+
     </>
   );
 };
