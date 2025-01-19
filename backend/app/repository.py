@@ -57,8 +57,8 @@ class OrderRepository:
                     order_id=db_order.id,  # Use the auto-generated order ID
                     order_item_id=item.id,
                     step=task.step,
-                    start_time=task.startTime,
-                    end_time=task.endTime,
+                    startTime=task.startTime,
+                    endTime=task.endTime,
                     resources=task.resources,
                     batch_size=task.batchSize,
                     status=task.status or 'pending'
@@ -399,28 +399,29 @@ class RecipeRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_recipe_by_id(self, recipe_id: int) -> Optional[models.RecipeDB]:
+    # Also update get_recipe_by_id to follow the same convention
+    def get_recipe_by_id(self, id: int) -> Optional[models.RecipeDB]:
         """Get a specific recipe by ID with all its relationships loaded"""
         try:
             # First do a simple check if recipe exists
-            logger.debug(f"Checking existence of recipe with ID: {recipe_id}")
+            logger.debug(f"Checking existence of recipe with ID: {id}")
             recipe_exists = self.db.query(models.RecipeDB.id)\
-                .filter(models.RecipeDB.id == recipe_id)\
+                .filter(models.RecipeDB.id == id)\
                 .scalar()
                 
             if not recipe_exists:
-                logger.error(f"Recipe with ID {recipe_id} not found")
-                raise HTTPException(status_code=404, detail=f"Recipe with ID {recipe_id} not found")
+                logger.error(f"Recipe with ID {id} not found")
+                raise HTTPException(status_code=404, detail=f"Recipe with ID {id} not found")
             
             # If recipe exists, fetch with all relationships
-            logger.debug(f"Fetching complete recipe data for ID: {recipe_id}")
+            logger.debug(f"Fetching complete recipe data for ID: {id}")
             recipe = self.db.query(models.RecipeDB)\
                 .options(
                     joinedload(models.RecipeDB.product),
                     joinedload(models.RecipeDB.steps),
                     joinedload(models.RecipeDB.ingredients).joinedload(models.RecipeIngredientDB.product)
                 )\
-                .filter(models.RecipeDB.id == recipe_id)\
+                .filter(models.RecipeDB.id == id)\
                 .first()
                 
             return recipe
@@ -428,7 +429,7 @@ class RecipeRepository:
         except HTTPException:
             raise
         except SQLAlchemyError as e:
-            logger.error(f"Database error fetching recipe with ID {recipe_id}: {str(e)}")
+            logger.error(f"Database error fetching recipe with ID {id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
@@ -453,6 +454,7 @@ class RecipeRepository:
                 joinedload(models.RecipeDB.ingredients).joinedload(models.RecipeIngredientDB.product)
             )\
             .all()
+
 
     def create_recipe(self, recipe_data: models.Recipe) -> models.RecipeDB:
         try:
@@ -549,56 +551,58 @@ class RecipeRepository:
             logger.error(f"Unexpected error creating recipe: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Unexpected error creating recipe: {str(e)}")
     
-    def update_recipe(self, recipe_id: int, recipe_data: Dict) -> models.RecipeDB:
+
+    def update_recipe(self, id: int, recipe_data: models.Recipe) -> models.RecipeDB:
         """Update an existing recipe"""
         try:
-            recipe = self.get_recipe_by_id(recipe_id)
+            recipe = self.get_recipe_by_id(id)
             if not recipe:
                 raise HTTPException(status_code=404, detail="Recipe not found")
 
-            # Update basic recipe info
-            for key, value in recipe_data.items():
-                if hasattr(recipe, key) and key not in ["id", "product_id"]:
-                    setattr(recipe, key, value)
+            # Update basic recipe fields
+            recipe.requires_chilling = recipe_data.requiresChilling
+            recipe.max_chill_time = recipe_data.maxChillTime
+            recipe.min_batch_size = recipe_data.minBatchSize
+            recipe.max_batch_size = recipe_data.maxBatchSize
+            recipe.unit = recipe_data.unit
+            recipe.product_id = recipe_data.product.id
 
-            # Update steps if provided
-            if "steps" in recipe_data:
-                # Remove existing steps
-                self.db.query(models.RecipeStepDB)\
-                    .filter(models.RecipeStepDB.recipe_id == recipe_id)\
-                    .delete()
-                
-                # Add new steps
-                for step_data in recipe_data["steps"]:
-                    step = models.RecipeStepDB(
-                        recipe_id=recipe_id,
-                        name=step_data["name"],
-                        duration=step_data["duration"],
-                        order=step_data["order"],
-                        requires_human=step_data.get("requires_human", False),
-                        requires_oven=step_data.get("requires_oven", False),
-                        requires_mixer=step_data.get("requires_mixer", False),
-                        must_follow_immediately=step_data.get("must_follow_immediately", False),
-                        scaling_factor=step_data.get("scaling_factor", 1.0)
-                    )
-                    self.db.add(step)
+            # Update steps
+            # First, remove existing steps
+            self.db.query(models.RecipeStepDB)\
+                .filter(models.RecipeStepDB.recipe_id == id)\
+                .delete(synchronize_session=False)
+            
+            # Add new steps
+            for step_data in recipe_data.steps:
+                step = models.RecipeStepDB(
+                    recipe_id=id,
+                    name=step_data.name,
+                    duration=step_data.duration,
+                    order=0,  # You might want to set this based on the order in the list
+                    requires_human=step_data.requiresHuman,
+                    requires_oven=step_data.requiresOven,
+                    requires_mixer=step_data.requiresMixer,
+                    must_follow_immediately=step_data.mustFollowImmediately,
+                    scaling_factor=step_data.scalingFactor
+                )
+                self.db.add(step)
 
-            # Update ingredients if provided
-            if "ingredients" in recipe_data:
-                # Remove existing ingredients
-                self.db.query(models.RecipeIngredientDB)\
-                    .filter(models.RecipeIngredientDB.recipe_id == recipe_id)\
-                    .delete()
-                
-                # Add new ingredients
-                for ing_data in recipe_data["ingredients"]:
-                    ingredient = models.RecipeIngredientDB(
-                        recipe_id=recipe_id,
-                        name=ing_data["name"],
-                        quantity=ing_data["quantity"],
-                        unit=ing_data["unit"]
-                    )
-                    self.db.add(ingredient)
+            # Update ingredients
+            # First, remove existing ingredients
+            self.db.query(models.RecipeIngredientDB)\
+                .filter(models.RecipeIngredientDB.recipe_id == id)\
+                .delete(synchronize_session=False)
+            
+            # Add new ingredients
+            for ing_data in recipe_data.ingredients:
+                ingredient = models.RecipeIngredientDB(
+                    recipe_id=id,
+                    product_id=ing_data.product.id,
+                    quantity=ing_data.qty,
+                    unit=ing_data.unit
+                )
+                self.db.add(ingredient)
 
             self.db.commit()
             self.db.refresh(recipe)
@@ -607,7 +611,12 @@ class RecipeRepository:
         except SQLAlchemyError as e:
             self.db.rollback()
             logger.error(f"Error updating recipe: {str(e)}")
-            raise HTTPException(status_code=500, detail="Error updating recipe")
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+
 
     def delete_recipe(self, recipe_id: int) -> bool:
         """Delete a recipe"""

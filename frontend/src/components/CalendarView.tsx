@@ -145,23 +145,30 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   }, [tasks, onEventDrop]);
 
   const events = useMemo(() => {
-    return tasks.map(task => ({
-      id: str(task.id),
-      title: `${task.product?.name || 'Unnamed'} (${task.orderId})`,
-      start: task.startTime,
-      end: task.endTime,
-      className: `step-${task.step}`,
-      backgroundColor: task.status === 'completed' ? '#10B981' : // green
-                      task.status === 'in-progress' ? '#3B82F6' : // blue
-                      task.status === 'blocked' ? '#EF4444' : // red
-                      '#6B7280', // gray for pending
-      borderColor: 'transparent',
-      textColor: 'white',
-      extendedProps: {
-        status: task.status,
-        step: task.step,
-      }
-    }));
+    return tasks.map(task => {
+      // Safeguard for undefined values
+      const taskId = task.id ? task.id.toString() : '';
+      const taskStartTime = task.startTime instanceof Date ? task.startTime : new Date();
+      const taskEndTime = task.endTime instanceof Date ? task.endTime : taskStartTime;
+
+      return {
+        id: taskId,
+        title: `${task.product?.name || 'Unnamed'} (${task.orderId})`,
+        start: taskStartTime,
+        end: taskEndTime,
+        className: `step-${task.step}`,
+        backgroundColor: task.status === 'completed' ? '#10B981' : // green
+                        task.status === 'in-progress' ? '#3B82F6' : // blue
+                        task.status === 'blocked' ? '#EF4444' : // red
+                        '#6B7280', // gray for pending
+        borderColor: 'transparent',
+        textColor: 'white',
+        extendedProps: {
+          status: task.status,
+          step: task.step,
+        }
+      };
+    });
   }, [tasks]);
 
   const settings = getViewSettings(viewMode);
@@ -218,7 +225,3 @@ const CalendarView: React.FC<CalendarViewProps> = ({
 };
 
 export default CalendarView;
-
-function str(id: number): any {
-  throw new Error('Function not implemented.');
-}

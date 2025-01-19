@@ -96,7 +96,7 @@ export const bakeryApi = {
 
   createOrder: async (order: Order): Promise<{
     status: number; 
-    orderId: string;
+    orderId: number;
     tasks: ScheduledTask[];
   }> => {
     const transformedOrder = {
@@ -124,7 +124,7 @@ export const bakeryApi = {
       body: JSON.stringify(transformedOrder),
     });
     
-    const result = await handleResponse<{ orderId: string; tasks: ScheduledTask[] }>(response);
+    const result = await handleResponse<{ orderId: number; tasks: ScheduledTask[] }>(response);
     return {
       orderId: result.orderId,
       status: response.status,
@@ -254,7 +254,7 @@ export const bakeryApi = {
   },
 
 
-createRecipe: async (recipe: Recipe): Promise<Recipe> => {
+createRecipe: async (recipe: Omit<Recipe, 'id'>): Promise<Recipe> => {
   const response = await fetch(`${API_BASE_URL}/recipes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -263,17 +263,47 @@ createRecipe: async (recipe: Recipe): Promise<Recipe> => {
   return handleResponse<Recipe>(response);
 },
 
-updateRecipe: async (recipeId: number, recipe: Recipe): Promise<Recipe> => {
-  const response = await fetch(`${API_BASE_URL}/recipes/${recipeId}`, {
+updateRecipe: async (id: number, recipe: Recipe): Promise<Recipe> => {
+  // Just use the ID in the path
+  const response = await fetch(`${API_BASE_URL}/recipes/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(recipe),
+    body: JSON.stringify({
+      id: id,
+      product: {
+        id: recipe.product.id,
+        name: recipe.product.name
+      },
+      ingredients: recipe.ingredients.map(ingredient => ({
+        product: {
+          id: ingredient.product.id,
+          name: ingredient.product.name
+        },
+        qty: ingredient.qty,
+        unit: ingredient.unit
+      })),
+      steps: recipe.steps.map(step => ({
+        id: step.id,
+        name: step.name,
+        duration: step.duration,
+        requiresHuman: step.requiresHuman,
+        requiresOven: step.requiresOven,
+        requiresMixer: step.requiresMixer,
+        mustFollowImmediately: step.mustFollowImmediately,
+        scalingFactor: step.scalingFactor
+      })),
+      requiresChilling: recipe.requiresChilling,
+      maxChillTime: recipe.maxChillTime,
+      minBatchSize: recipe.minBatchSize,
+      maxBatchSize: recipe.maxBatchSize,
+      unit: recipe.unit
+    }),
   });
   return handleResponse<Recipe>(response);
 },
 
-deleteRecipe: async (recipeId: number): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/recipes/${recipeId}`, {
+deleteRecipe: async (id: number): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/recipes/${id}`, {
     method: 'DELETE',
   });
   return handleResponse<void>(response);

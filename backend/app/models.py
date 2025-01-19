@@ -51,6 +51,9 @@ class OrderItemDB(Base):
     order = relationship("OrderDB", back_populates="items")
     tasks = relationship("ScheduledTaskDB", back_populates="order_item", cascade="all, delete-orphan")
 
+
+
+
 class RecipeStepDB(Base):
     __tablename__ = "recipe_steps"
     
@@ -59,13 +62,36 @@ class RecipeStepDB(Base):
     name = Column(String, nullable=False)
     duration = Column(Integer, nullable=False)
     order = Column(Integer, nullable=False)
-    requires_human = Column(Boolean, default=False)
-    requires_oven = Column(Boolean, default=False)
-    requires_mixer = Column(Boolean, default=False)
-    must_follow_immediately = Column(Boolean, default=False)
-    scaling_factor = Column(Float, default=1.0)
+    requires_human = Column('requires_human', Boolean, default=False)
+    requires_oven = Column('requires_oven', Boolean, default=False)
+    requires_mixer = Column('requires_mixer', Boolean, default=False)
+    must_follow_immediately = Column('must_follow_immediately', Boolean, default=False)
+    scaling_factor = Column('scaling_factor', Float, default=1.0)
     
     recipe = relationship("RecipeDB", back_populates="steps")
+
+    @property
+    def requiresHuman(self):
+        return self.requires_human
+
+    @property
+    def requiresOven(self):
+        return self.requires_oven
+
+    @property
+    def requiresMixer(self):
+        return self.requires_mixer
+
+    @property
+    def mustFollowImmediately(self):
+        return self.must_follow_immediately
+
+    @property
+    def scalingFactor(self):
+        return self.scaling_factor
+
+
+
 
 class RecipeIngredientDB(Base):
     __tablename__ = "recipe_ingredients"
@@ -74,10 +100,15 @@ class RecipeIngredientDB(Base):
     recipe_id = Column(Integer, ForeignKey("recipes.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     quantity = Column(Float, nullable=False)
-    unit = Column(Integer, nullable=False)
+    unit = Column(String, nullable=False)
     
-    product = relationship("ProductDB")  # Simplified relationship
+    product = relationship("ProductDB")
     recipe = relationship("RecipeDB", back_populates="ingredients")
+
+    @property
+    def qty(self):
+        return self.quantity
+
 
 class RecipeDB(Base):
     __tablename__ = "recipes"
@@ -141,45 +172,86 @@ class Product(BaseModel):
     class Config:
         from_attributes = True
 
+
+
 class ProductionStep(BaseModel):
-    id: Optional[int] = None  # Change to integer
+    id: Optional[int] = None
     name: str
     duration: int = Field(gt=0)
     requiresHuman: bool
     requiresOven: bool
     requiresMixer: bool
     mustFollowImmediately: bool
-    scalingFactor: Optional[float] = Field(gt=0.0, default=1.0)
+    scalingFactor: float = Field(gt=0.0, default=1.0)
 
     class Config:
         from_attributes = True
+        populate_by_name = True
+        
+        alias_generator = lambda string: ''.join(
+            word.capitalize() if i > 0 else word
+            for i, word in enumerate(string.split('_'))
+        )
+
+        @classmethod
+        def get_properties(cls):
+            return {
+                'requires_human': 'requiresHuman',
+                'requires_oven': 'requiresOven',
+                'requires_mixer': 'requiresMixer',
+                'must_follow_immediately': 'mustFollowImmediately',
+                'scaling_factor': 'scalingFactor',
+            }
+
 
 class Ingredient(BaseModel):
-    id: Optional[int] = None  # Make ingredient id optional
-    product: Product  # Add this line
+    id: Optional[int] = None
+    product: Product
     unit: str
     qty: float
 
     class Config:
         from_attributes = True
+        populate_by_name = True
+        
+        # Map quantity to qty
+        alias_generator = lambda string: 'qty' if string == 'quantity' else string
+
+
+
 
 class Recipe(BaseModel):
-    id: Optional[int] = None  # Make id optional
-    ingredients: List[Ingredient]
+    id: Optional[int] = None
     product: Product
+    ingredients: List[Ingredient]
     steps: List[ProductionStep]
-    requiresChilling: bool
-    maxChillTime: int = Field(ge=0)
-    minBatchSize: int = Field(gt=0)
-    maxBatchSize: int = Field(gt=0)
+    requiresChilling: bool = Field(alias='requires_chilling')
+    maxChillTime: int = Field(ge=0, alias='max_chill_time')
+    minBatchSize: int = Field(gt=0, alias='min_batch_size')
+    maxBatchSize: int = Field(gt=0, alias='max_batch_size')
     unit: str
-
-    @property
-    def total_duration(self) -> int:
-        return sum(step.duration for step in self.steps)
 
     class Config:
         from_attributes = True
+        populate_by_name = True
+        json_encoders = {datetime: str}
+        alias_generator = lambda string: ''.join(
+            word.capitalize() if i > 0 else word
+            for i, word in enumerate(string.split('_'))
+        )
+
+        # Add property mappings
+        @classmethod
+        def get_properties(cls):
+            return {
+                'requires_chilling': 'requiresChilling',
+                'max_chill_time': 'maxChillTime',
+                'min_batch_size': 'minBatchSize',
+                'max_batch_size': 'maxBatchSize',
+            }
+
+
+
 
 class OrderItem(BaseModel):
     product: Product
@@ -216,7 +288,7 @@ class Order(BaseModel):
 
 
 class ScheduledTask(BaseModel):
-    orderId: str
+    orderId: int
     step: str
     startTime: datetime
     endTime: datetime
@@ -237,7 +309,7 @@ class ValidationResponse(BaseModel):
     warnings: List[str] = Field(default_factory=list)
 
 class ScheduleResponse(BaseModel):
-    orderId: str
+    orderId: int
     tasks: List[ScheduledTask]
 
     @property

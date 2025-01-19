@@ -199,7 +199,8 @@ class BakeryScheduler:
         concurrent_mixers = 0
 
         for task in existing_tasks:
-            if self._tasks_overlap(start_time, end_time, task.startTime, task.endTime):
+             if self._tasks_overlap(start_time, end_time, task.startTime, task.endTime):                
+                
                 if 'baker' in task.resources:
                     concurrent_bakers += 1
                 if 'oven' in task.resources:

@@ -289,7 +289,7 @@ def create_default_data(session):
         # Generate 10 orders between Jan 18-24, 2025
         start_date = datetime(2025, 1, 18)
         
-        for i in range(10):
+        for i in range(50):
             customer = random.choice(customers)
             days_offset = random.randint(0, 6)
             delivery_date = (start_date + timedelta(days=days_offset)).strftime("%Y-%m-%d")
@@ -376,8 +376,8 @@ def create_default_data(session):
                             order_id=order.id,
                             order_item_id=order_item.id,
                             step=step.name.lower(),
-                            start_time=start_time,
-                            end_time=end_time,
+                            start_time=start_time,  # Changed from startTime
+                            end_time=end_time,      # Changed from endTime
                             resources=["Crubby"],
                             batch_size=min(order_item.quantity, recipe.max_batch_size),
                             status='pending'

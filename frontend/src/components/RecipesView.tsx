@@ -1,9 +1,9 @@
-// RecipesView.tsx
-// Remove unused imports and fix type definitions
 import React, { useState, useEffect } from 'react';
 import { bakeryApi } from '../api/bakeryApi';
-import { Recipe, Step, Ingredient, ProductionStep, PRODUCTION_STEPS, Product } from '../types';
+import { Recipe, Step, Ingredient, ProductionStep, PRODUCTION_STEPS, Product, ValidationError, RecipeFormProps } from '../types';
 import { Plus, Edit, Trash2, ChevronDown, ChevronUp, X, Minus } from 'lucide-react';
+import { Alert, AlertDialogDescription, AlertDialogTitle } from '../ui/Alert';
+import { NullLiteral } from 'typescript';
 
 // UI Components
 const Card = ({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
@@ -24,6 +24,38 @@ const CardContent = ({ children, className, ...props }: React.HTMLAttributes<HTM
   <div className={`p-6 pt-0 ${className}`} {...props}>{children}</div>
 );
 
+// Error Handler Component
+interface RecipeErrorHandlerProps {
+  error: ValidationError | string | null;
+  onDismiss: () => void;
+}
+
+const RecipeErrorHandler: React.FC<RecipeErrorHandlerProps> = ({ error, onDismiss }) => {
+  if (!error) return null;
+
+  const errorMessage = typeof error === 'string' 
+    ? error 
+    : error.detail?.[0]?.msg || error.message || 'An unexpected error occurred';
+
+  return (
+    <Alert variant="error" className="mb-4">
+      <AlertDialogTitle className="flex items-center justify-between">
+        Error
+        <button 
+          type="button" 
+          onClick={onDismiss} 
+          className="text-gray-500 hover:text-gray-700"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </AlertDialogTitle>
+      <AlertDialogDescription>
+        {errorMessage}
+      </AlertDialogDescription>
+    </Alert>
+  );
+};
+
 const Button = ({
   children,
   variant = 'default',
@@ -31,8 +63,8 @@ const Button = ({
   className = '',
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'default' | 'ghost' | 'destructive',
-  size?: 'default' | 'sm' | 'lg'
+  variant?: 'default' | 'ghost' | 'destructive';
+  size?: 'default' | 'sm' | 'lg';
 }) => {
   const variants = {
     default: 'bg-blue-500 text-white hover:bg-blue-600',
@@ -62,8 +94,8 @@ const Button = ({
 // Recipe Card Component
 const RecipeCard: React.FC<{
   recipe: Recipe;
-  onEdit: (recipe: Recipe) => void;
-  onDelete: (recipeId: number) => void;
+  onEdit: (id: number, recipe: Recipe) => void;
+  onDelete: (id: number) => void;
 }> = ({ recipe, onEdit, onDelete }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -72,7 +104,7 @@ const RecipeCard: React.FC<{
       <div className="p-4">
         <div className="flex justify-between items-start">
           <div className="flex-1">
-          <p className="text-lg font-semibold">{recipe.id}</p>
+            <p className="text-lg font-semibold">{recipe.id}</p>
             <h3 className="text-lg font-semibold">{recipe.product.name}</h3>
             <p className="text-sm text-gray-500">
               Batch size: {recipe.minBatchSize} - {recipe.maxBatchSize} {recipe.unit}
@@ -82,7 +114,7 @@ const RecipeCard: React.FC<{
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onEdit(recipe)}
+              onClick={() => onEdit(recipe.id, recipe)}
             >
               <Edit className="h-4 w-4" />
             </Button>
@@ -149,10 +181,9 @@ const RecipeCard: React.FC<{
   );
 };
 
-
 const emptyStep: Step = {
   id: 0,
-  name: 'mixing' as ProductionStep,  // Use your enum type
+  name: '' as ProductionStep,
   duration: 0,
   requiresHuman: false,
   requiresOven: false,
@@ -161,42 +192,33 @@ const emptyStep: Step = {
   scalingFactor: 1.0
 };
 
-
 const emptyIngredient: Ingredient = {
   product: {
     name: '',
     id: 0
   },
-
   unit: '',
   qty: 0
 };
 
+const emptyProduct: Product = {
+  name: '',
+  id: 0
+};
 
-
-
-interface RecipeFormProps {
-  initialRecipe?: Recipe;
-  onSubmit: (recipe: Recipe) => void;
-  onCancel: () => void;
-}
 
 const RecipeForm: React.FC<RecipeFormProps> = ({
   initialRecipe,
   onSubmit,
   onCancel
 }) => {
-
-
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ValidationError | string | null>(null);
 
   useEffect(() => {
     fetchProducts();
-
   }, []);
-
 
   const fetchProducts = async () => {
     try {
@@ -211,37 +233,38 @@ const RecipeForm: React.FC<RecipeFormProps> = ({
     }
   };
 
+  
+  
+  // In RecipeForm, update the formData state initialization
+const [formData, setFormData] = useState<Recipe>(() => {
+  if (initialRecipe) {
+    return { ...initialRecipe };
+  }
+  return {
+    id: 0, // Add a default id for new recipes
+    product: { ...emptyProduct },
+    ingredients: [{ ...emptyIngredient }],
+    steps: [{ ...emptyStep }],
+    requiresChilling: false,
+    maxChillTime: 0,
+    minBatchSize: 1,
+    maxBatchSize: 50,
+    unit: 'pieces'
+  };
+});
 
-  const [formData, setFormData] = useState<Omit<Recipe, 'id'>>(() => {
-    if (initialRecipe) {
-      return { ...initialRecipe };
-    }
-    return {
-      product: { id: 23, name: 'cookies' },
-      ingredients: [{ ...emptyIngredient }],
-      steps: [{ ...emptyStep }],
-      requiresChilling: false,
-      maxChillTime: 0,
-      minBatchSize: 1,
-      maxBatchSize: 50,
-      unit: 'pieces'
-    };
-  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    const validatedSteps = formData.steps.map(step => ({
-      ...step,
-      id: step.id ? String(step.id) : undefined // Convert to string
-    }));
-  
-    const validatedRecipe = {
-      ...formData,
-      steps: validatedSteps
-    };
-  
-    onSubmit(formData as Recipe);
+    try {
+      onSubmit(formData as Recipe);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred');
+      }
+    }
   };
 
   return (
@@ -259,32 +282,37 @@ const RecipeForm: React.FC<RecipeFormProps> = ({
         </button>
       </div>
 
-      <div className="space-y-4">
+      <RecipeErrorHandler 
+        error={error} 
+        onDismiss={() => setError(null)} 
+      />
+
+            <div className="space-y-4">
         {/* Product Information */}
         <div>
           <label className="block text-sm font-medium mb-1">Product Name</label>
-
-
-        <select key={formData.product.id}
-                     value={formData.product.id}
-                     onChange={e => {
-                       setFormData({ ...formData, product: {
-                        id: Number(e.target.value), 
-                        name: products[e.target.selectedIndex].name
-                      } });
-                     }}
-                     className="w-full px-3 py-2 border rounded-md"
-                     required
-                  >
-
-                    {products.map(product => (
-                      <option key={product.id} value={product.id}>
-                        {product.name.charAt(0).toUpperCase() + product.name.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-
-                  </div>
+          <select
+            key={formData.product.id}
+            value={formData.product.id}
+            onChange={e => {
+              setFormData({
+                ...formData,
+                product: {
+                  id: Number(e.target.value),
+                  name: products[e.target.selectedIndex].name
+                }
+              });
+            }}
+            className="w-full px-3 py-2 border rounded-md"
+            required
+          >
+            {products.map(product => (
+              <option key={product.id} value={product.id}>
+                {product.name.charAt(0).toUpperCase() + product.name.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* Batch Size Settings */}
         <div className="grid grid-cols-3 gap-4">
@@ -350,34 +378,28 @@ const RecipeForm: React.FC<RecipeFormProps> = ({
           <div className="space-y-2">
             {formData.ingredients.map((ingredient, index) => (
               <div key={index} className="flex gap-2">
-
-
                 <select
                   value={ingredient.product.id}
                   onChange={e => {
                     const newIngredients = [...formData.ingredients];
                     newIngredients[index] = {
                       ...ingredient,
-                      product: { 
-                        id:  Number(e.target.value),
-                      name:  products[e.target.selectedIndex].name
-                       }
+                      product: {
+                        id: Number(e.target.value),
+                        name: products[e.target.selectedIndex].name
+                      }
                     };
-
                     setFormData({ ...formData, ingredients: newIngredients });
                   }}
                   className="w-full px-3 py-2 border rounded-md"
                   required
                 >
-
                   {products.map(product => (
-                    <option key ={product.id} value={product.id}>
+                    <option key={product.id} value={product.id}>
                       {product.name.charAt(0).toUpperCase() + product.name.slice(1)}
                     </option>
                   ))}
-
                 </select>
-
 
                 <input
                   type="text"
@@ -460,14 +482,14 @@ const RecipeForm: React.FC<RecipeFormProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-
                 <div>
                   <select
                     value={step.name}
                     onChange={e => {
                       const newSteps = [...formData.steps];
-                      newSteps[index] = { ...step,  
-                        name: e.target.value as ProductionStep 
+                      newSteps[index] = {
+                        ...step,
+                        name: e.target.value as ProductionStep
                       };
                       setFormData({ ...formData, steps: newSteps });
                     }}
@@ -481,7 +503,6 @@ const RecipeForm: React.FC<RecipeFormProps> = ({
                     ))}
                   </select>
                 </div>
-
 
                 <div>
                   <input
@@ -546,7 +567,10 @@ const RecipeForm: React.FC<RecipeFormProps> = ({
                     checked={step.mustFollowImmediately}
                     onChange={e => {
                       const newSteps = [...formData.steps];
-                      newSteps[index] = { ...step, mustFollowImmediately: e.target.checked };
+                      newSteps[index] = {
+                        ...step,
+                        mustFollowImmediately: e.target.checked
+                      };
                       setFormData({ ...formData, steps: newSteps });
                     }}
                     className="mr-2"
@@ -566,7 +590,7 @@ const RecipeForm: React.FC<RecipeFormProps> = ({
               checked={formData.requiresChilling}
               onChange={e => setFormData({
                 ...formData,
-                requiresChilling: e.target.checked
+                requiresChilling: e.target.checked ? true : false
               })}
               className="mr-2"
             />
@@ -615,13 +639,12 @@ const RecipeForm: React.FC<RecipeFormProps> = ({
 const RecipesView: React.FC = () => {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ValidationError | string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | undefined>(undefined);
 
   useEffect(() => {
     fetchRecipes();
-
   }, []);
 
   const fetchRecipes = async () => {
@@ -637,10 +660,7 @@ const RecipesView: React.FC = () => {
     }
   };
 
-
-
-
-  const handleEdit = (recipe: Recipe) => {
+  const handleEdit = (id: number, recipe: Recipe) => {
     setSelectedRecipe(recipe);
     setIsFormOpen(true);
   };
@@ -651,25 +671,36 @@ const RecipesView: React.FC = () => {
   };
 
 
-  const handleFormSubmit = async (recipe: Recipe) => {
+  // In RecipesView.tsx, modify handleFormSubmit:
+const handleFormSubmit = async (recipe: Recipe) => {
+  try {
+    setLoading(true);
+    setError(null);
     
-    try {
-      setLoading(true);
-      if (selectedRecipe?.id) {
-        const updatedRecipe = await bakeryApi.updateRecipe(selectedRecipe.id, recipe);
-        setRecipes(recipes.map(r => r.id === updatedRecipe.id ? updatedRecipe : r));
-      } else {
-        const newRecipe = await bakeryApi.createRecipe(recipe);
-        setRecipes([...recipes, newRecipe]);
-      }
-      setIsFormOpen(false);
-    } catch (err) {
-      console.error('Error saving recipe:', err);
-      setError('Failed to save recipe. Please try again.');
-    } finally {
-      setLoading(false);
+    if (selectedRecipe?.id) {
+      // Update existing recipe - pass the recipe directly
+      const updatedRecipe = await bakeryApi.updateRecipe(selectedRecipe.id, recipe);
+      setRecipes(recipes.map(r => r.id === updatedRecipe.id ? updatedRecipe : r));
+    } else {
+      // Create new recipe
+      const newRecipe = await bakeryApi.createRecipe(recipe);
+      setRecipes([...recipes, newRecipe]);
     }
-  };
+    setIsFormOpen(false);
+  } catch (err: unknown) {
+    console.error('Error saving recipe:', err);
+    if (err instanceof Error) {
+      setError(err.message);
+    } else if (typeof err === 'object' && err !== null && 'response' in err) {
+      const apiError = err as { response: { data: ValidationError } };
+      setError(apiError.response.data);
+    } else {
+      setError('Failed to save recipe. Please try again.');
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
 
 
@@ -690,13 +721,14 @@ const RecipesView: React.FC = () => {
     }
   };
 
-
   if (loading && !isFormOpen) {
     return <div className="flex justify-center items-center h-64">Loading recipes...</div>;
   }
 
   if (error && !recipes.length) {
-    return <div className="text-red-500 p-4">{error}</div>;
+    return <div className="text-red-500 p-4">{
+      typeof error === 'string' ? error : error.message || 'An error occurred'
+    }</div>;
   }
 
   return (

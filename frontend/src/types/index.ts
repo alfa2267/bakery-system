@@ -303,3 +303,19 @@ export interface GanttViewProps {
   onDateChange: (task: ScheduledTask, start: Date, end: Date) => Promise<void>;
   onProgressChange: (task: ScheduledTask, progress: number) => Promise<void>;
 }
+
+export interface ValidationError {
+  detail?: Array<{
+    type?: string;
+    loc?: string[];
+    msg?: string;
+    input?: any;
+  }>;
+  message?: string;
+}
+
+export interface RecipeFormProps {
+  initialRecipe?: Recipe;
+  onSubmit: (recipe: Recipe) => void;
+  onCancel: () => void;
+}

@@ -173,16 +173,17 @@ async def create_recipe(
 
 
 
-@app.put("/recipes/{recipes_id}", response_model=Recipe)
+# Update this endpoint definition in main.py
+@app.put("/recipes/{id}", response_model=Recipe)
 async def update_recipe(
-    recipe_id: int,
+    id: int,  # Changed from recipe_id to id
     recipe: Recipe,
     db: Session = Depends(get_db)
 ):
     """Update an existing recipe"""
     try:
         repository = RecipeRepository(db)
-        db_recipe = repository.update_recipe(recipe_id, recipe)
+        db_recipe = repository.update_recipe(id, recipe)  # Using id here
         if not db_recipe:
             raise HTTPException(status_code=404, detail="Recipe not found")
         return db_recipe
@@ -195,7 +196,6 @@ async def update_recipe(
             status_code=500,
             detail=f"Could not update recipe: {str(e)}"
         )
-
 
 @app.delete("/recipes/{recipe_id}")
 async def delete_recipe(recipe_id: int, db: Session = Depends(get_db)):
@@ -347,7 +347,7 @@ async def get_config():
 
 @app.put("/tasks/{task_id}/timing")
 async def update_task_timing(
-    task_id: str,
+    task_id: int,
     timing: TaskTimingUpdate,
     db: Session = Depends(get_db)
 ):
@@ -357,7 +357,7 @@ async def update_task_timing(
         updated_task = repository.update_task_timing(task_id, timing.start, timing.end)
         
         return {
-            "id":int(updated_task.id),
+            "id": updated_task.id,
             "time": updated_task.start_time.isoformat(),
             "action": updated_task.step,
             "details": f"{updated_task.step} for Order {updated_task.order_id}",
@@ -373,7 +373,7 @@ async def update_task_timing(
 
 @app.put("/tasks/{task_id}/status")
 async def update_task_status(
-    task_id: str,
+    task_id: int,
     status: str = Body(...),
     db: Session = Depends(get_db)
 ):
@@ -589,7 +589,7 @@ def _calculate_resource_utilization(tasks: List[ScheduledTask]) -> List[Resource
                 (task.endTime - task.startTime).total_seconds() / 60 
                 for task in resource_tasks
             )
-            utilization_percentage = (busy_minutes / total_minutes) * 100
+            utilization_percentage = 100 #(busy_minutes / total_minutes) * 100
             
             resource_utilization.append(
                 ResourceUtilization(
