@@ -1,7 +1,7 @@
 // src/App.tsx
 import React from 'react';
 import { useState } from 'react';
-import { ChefHat, Calendar, User, PlusCircle, ClipboardList, Truck, Monitor, Users, BookOpen, BarChart3, Settings } from 'lucide-react';
+import { ChefHat, Calendar, User, PlusCircle, ClipboardList, Truck, Monitor, Users, BookOpen, BarChart3, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from './components/ui/button';
 import EnhancedOrderForm from './components/EnhancedOrderForm';
 import BakerView from './components/BakerView';
@@ -163,7 +163,15 @@ const App: React.FC = () => {
                 <UnifiedKOT defaultView="manager" workstation={selectedWorkstation} selectedDate={selectedDate} />
               </>
             ) : viewMode === 'new-order' ? (
-              <EnhancedOrderForm />
+              <>
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h1 className="text-3xl font-bold text-foreground mb-2">Place New Order</h1>
+                    <p className="text-muted-foreground">Create and customize bakery orders</p>
+                  </div>
+                </div>
+                <EnhancedOrderForm />
+              </>
             ) : viewMode === 'manager' ? (
               <ConsolidatedScheduleView />
             ) : viewMode === 'orders' ? (
@@ -237,7 +245,15 @@ const App: React.FC = () => {
                 <ResourceUtilizationDashboard />
               </>
             ) : viewMode === 'settings' ? (
-              <BakerySettings />
+              <>
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h1 className="text-3xl font-bold text-foreground mb-2">Bakery Settings</h1>
+                    <p className="text-muted-foreground">Configure operational parameters and equipment</p>
+                  </div>
+                </div>
+                <BakerySettings />
+              </>
             ) : null}
       </div>
 

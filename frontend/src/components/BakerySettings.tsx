@@ -296,10 +296,6 @@ export function BakerySettings() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Bakery Settings</h1>
-          <p className="text-muted-foreground">Configure operational parameters and equipment</p>
-        </div>
         <Button onClick={saveSettings} disabled={saving} className="flex items-center gap-2">
           <Save className="h-4 w-4" />
           {saving ? 'Saving...' : 'Save All Settings'}

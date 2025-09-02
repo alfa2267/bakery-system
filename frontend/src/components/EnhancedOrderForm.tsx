@@ -228,8 +228,6 @@ const EnhancedOrderForm: React.FC = () => {
 
   return (
     <div className="bg-white rounded-lg shadow-md">
-      <h2 className="text-3xl font-bold mb-6 text-gray-800">Place New Order</h2>
-
       {submitSuccess && (
         <Alert className="mb-4">
           <AlertTitle>Success</AlertTitle>
