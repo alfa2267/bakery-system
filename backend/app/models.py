@@ -228,6 +228,7 @@ class ScheduledTaskDB(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(String, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    equipment_id = Column(Integer, ForeignKey("equipment.id", ondelete="CASCADE"), nullable=True)
     step = Column(String, nullable=False)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
@@ -236,6 +237,7 @@ class ScheduledTaskDB(Base):
     status = Column(String, nullable=False, default='pending')  # pending, in-progress, completed, blocked
     
     order = relationship("OrderDB", back_populates="tasks")
+    equipment = relationship("EquipmentDB", back_populates="scheduled_tasks")
 
 # Operational Configuration Models
 class BakerySettingsDB(Base):
@@ -309,7 +311,7 @@ class CustomerAddress(BaseModel):
 class Customer(BaseModel):
     first_name: str = Field(..., min_length=1)
     last_name: str = Field(..., min_length=1)
-    email: str = Field(..., regex=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+    email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
     phone: str = Field(..., min_length=10)
     address: CustomerAddress
 
@@ -613,7 +615,7 @@ class CakeConfiguratorResponse(BaseModel):
 class Equipment(BaseModel):
     id: Optional[int] = None
     name: str = Field(..., min_length=1)
-    type: str = Field(..., regex="^(oven|mixer|prep_station|packaging)$")
+    type: str = Field(..., pattern="^(oven|mixer|prep_station|packaging)$")
     capacity: int = Field(..., gt=0)
     efficiency_rating: float = Field(..., ge=0.0, le=1.0)
     maintenance_interval_hours: int = Field(..., gt=0)
@@ -628,8 +630,8 @@ class Equipment(BaseModel):
 class OperatingHours(BaseModel):
     id: Optional[int] = None
     day_of_week: int = Field(..., ge=0, le=6)
-    open_time: str = Field(..., regex="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
-    close_time: str = Field(..., regex="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
+    open_time: str = Field(..., pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
+    close_time: str = Field(..., pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
     is_open: bool = True
     notes: Optional[str] = None
 
@@ -639,10 +641,10 @@ class OperatingHours(BaseModel):
 class StaffSchedule(BaseModel):
     id: Optional[int] = None
     staff_name: str = Field(..., min_length=1)
-    role: str = Field(..., regex="^(baker|manager|assistant)$")
+    role: str = Field(..., pattern="^(baker|manager|assistant)$")
     day_of_week: int = Field(..., ge=0, le=6)
-    start_time: str = Field(..., regex="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
-    end_time: str = Field(..., regex="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
+    start_time: str = Field(..., pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
+    end_time: str = Field(..., pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$")
     is_available: bool = True
     skills: Optional[List[str]] = None
     notes: Optional[str] = None

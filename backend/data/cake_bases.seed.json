@@ -1,0 +1,59 @@
+{
+  "cake_bases": [
+    {
+      "id": 1,
+      "name": "Vanilla Sponge",
+      "description": "Light and fluffy vanilla sponge cake base",
+      "base_price": 2500.0,
+      "image_emoji": "🍰",
+      "image_url": "/images/vanilla-sponge.jpg",
+      "is_popular": true,
+      "is_active": true,
+      "category": "cake"
+    },
+    {
+      "id": 2,
+      "name": "Chocolate Fudge",
+      "description": "Rich and moist chocolate fudge cake base",
+      "base_price": 2800.0,
+      "image_emoji": "🍫",
+      "image_url": "/images/chocolate-fudge.jpg",
+      "is_popular": true,
+      "is_active": true,
+      "category": "cake"
+    },
+    {
+      "id": 3,
+      "name": "Red Velvet",
+      "description": "Classic red velvet cake with cream cheese flavor",
+      "base_price": 3200.0,
+      "image_emoji": "❤️",
+      "image_url": "/images/red-velvet.jpg",
+      "is_popular": true,
+      "is_active": true,
+      "category": "cake"
+    },
+    {
+      "id": 4,
+      "name": "Carrot Cake",
+      "description": "Moist carrot cake with warm spices",
+      "base_price": 2700.0,
+      "image_emoji": "🥕",
+      "image_url": "/images/carrot-cake.jpg",
+      "is_popular": false,
+      "is_active": true,
+      "category": "cake"
+    },
+    {
+      "id": 5,
+      "name": "Lemon Poppy Seed",
+      "description": "Zesty lemon cake with poppy seeds",
+      "base_price": 2600.0,
+      "image_emoji": "🍋",
+      "image_url": "/images/lemon-poppy.jpg",
+      "is_popular": false,
+      "is_active": true,
+      "category": "cake"
+    }
+  ]
+}

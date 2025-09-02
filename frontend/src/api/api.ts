@@ -17,7 +17,7 @@ const API_BASE_URL = (() => {
     return 'https://fluffy-cod-wr6xg46jp9429j6j-8000.app.github.dev';
   }
   // Fallback to localhost for local development
-  return process.env.REACT_APP_API_URL || 'http://localhost:8000';
+  return process.env.REACT_APP_API_URL || 'http://localhost:8001';
 })();
 
 // Utility function for handling API responses
@@ -406,6 +406,8 @@ export const bakeryApi = {
         busy_minutes: number;
         total_minutes: number;
       }>;
+      start_time?: string;
+      end_time?: string;
     };
   }> => {
     const params = new URLSearchParams();
@@ -429,9 +431,21 @@ export const bakeryApi = {
     }>(response);
   },
 
-  getBakerTasks: async (bakerName: string): Promise<{ items: any[] }> => {
-    const response = await fetch(`${API_BASE_URL}/baker/${bakerName}`);
-    return handleResponse<{ items: any[] }>(response);
+  getBakerTasks: async (bakerName?: string): Promise<{ tasks: any[] }> => {
+    const url = bakerName ? `${API_BASE_URL}/baker/${bakerName}` : `${API_BASE_URL}/baker/tasks`;
+    const response = await fetch(url);
+    return handleResponse<{ tasks: any[] }>(response);
+  },
+
+  updateTaskStatus: async (bakerName: string, taskId: string, status: string): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/baker/${bakerName}/task/${taskId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status }),
+    });
+    return handleResponse<void>(response);
   },
 
   getAvailableRecipes: async (): Promise<{ recipes: any[] }> => {

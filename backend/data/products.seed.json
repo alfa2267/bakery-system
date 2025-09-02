@@ -1,0 +1,64 @@
+{
+  "products": [
+    {
+      "id": 1,
+      "name": "Chocolate Chip Cookies",
+      "description": "Classic chocolate chip cookies",
+      "base_price": 500.0,
+      "category": "cookies",
+      "is_popular": true,
+      "image_url": "/images/chocolate-chip-cookies.jpg",
+      "is_active": true
+    },
+    {
+      "id": 2,
+      "name": "Brownies",
+      "description": "Rich chocolate brownies",
+      "base_price": 800.0,
+      "category": "brownies",
+      "is_popular": true,
+      "image_url": "/images/brownies.jpg",
+      "is_active": true
+    },
+    {
+      "id": 3,
+      "name": "Croissants",
+      "description": "Buttery French croissants",
+      "base_price": 600.0,
+      "category": "croissants",
+      "is_popular": true,
+      "image_url": "/images/croissants.jpg",
+      "is_active": true
+    },
+    {
+      "id": 4,
+      "name": "Bread Loaf",
+      "description": "Fresh baked bread",
+      "base_price": 400.0,
+      "category": "bread",
+      "is_popular": false,
+      "image_url": "/images/bread-loaf.jpg",
+      "is_active": true
+    },
+    {
+      "id": 5,
+      "name": "Cupcakes",
+      "description": "Assorted cupcakes",
+      "base_price": 300.0,
+      "category": "cupcakes",
+      "is_popular": true,
+      "image_url": "/images/cupcakes.jpg",
+      "is_active": true
+    },
+    {
+      "id": 6,
+      "name": "Muffins",
+      "description": "Fresh baked muffins",
+      "base_price": 350.0,
+      "category": "muffins",
+      "is_popular": false,
+      "image_url": "/images/muffins.jpg",
+      "is_active": true
+    }
+  ]
+}

@@ -1,93 +1,129 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Button } from "./ui/button"
 import { Badge } from "./ui/badge"
-import { MapPin, Clock, User, Phone, MessageCircle, FileText, AlertCircle } from "lucide-react"
+import { MapPin, Clock, User, Phone, MessageCircle, FileText, AlertCircle, RefreshCw } from "lucide-react"
+import { bakeryApi } from "../api/api"
+
+// Simple API function for delivery tracking
+const deliveryApi = {
+  async getDeliveryTracking(orderId: string) {
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8001'}/delivery/tracking/${orderId}`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return response.json()
+  }
+}
 
 interface DeliveryData {
-  orderId: string
-  status: "order_placed" | "confirmed" | "preparation" | "dispatched" | "delivered"
-  customer: {
+  order_id: string
+  status: "pending" | "picked_up" | "in_transit" | "delivered"
+  current_location?: {
+    lat: number
+    lng: number
+  }
+  estimated_arrival?: string
+  actual_arrival?: string
+  tracking_code?: string
+  agent?: {
+    name: string
+    phone: string
+  }
+  customer?: {
     name: string
     address: string
     phone: string
-    notes: string
   }
-  delivery: {
-    agent: string
-    carrier: string
-    vehicle: string
-    estimatedArrival: string
-    requestedDate: string
-  }
-  items: Array<{
-    name: string
-    quantity: number
-    notes?: string
-  }>
 }
 
 interface DeliveryTrackerProps {
   selectedDelivery?: string | null
 }
 
-const sampleDeliveryData: DeliveryData = {
-  orderId: "SO-2024-001",
-  status: "dispatched",
-  customer: {
-    name: "Downtown Cafe",
-    address: "123 Main Street, Downtown District, City Center",
-    phone: "+1 (555) 123-4567",
-    notes:
-      "Please use the back entrance for deliveries. Contact manager Sarah if main door is locked. Delivery window: 8AM-10AM preferred.",
-  },
-  delivery: {
-    agent: "Pierre Martin",
-    carrier: "Bakery Express",
-    vehicle: "Van #001 (Refrigerated)",
-    estimatedArrival: "09:30",
-    requestedDate: "15/01/2024",
-  },
-  items: [
-    { name: "Artisan Sourdough Loaf", quantity: 12 },
-    { name: "Butter Croissants", quantity: 24 },
-    { name: "Pain au Chocolat", quantity: 18, notes: "Extra chocolate requested" },
-  ],
-}
-
 const statusSteps = [
-  { key: "order_placed", label: "Order Placed", icon: "📋" },
-  { key: "confirmed", label: "Confirmed", icon: "✅" },
-  { key: "preparation", label: "Preparation", icon: "👨‍🍳" },
-  { key: "dispatched", label: "Dispatched", icon: "🚚" },
-  { key: "delivered", label: "Delivered", icon: "📦" },
+  { key: "pending", label: "Order Placed", icon: "📋" },
+  { key: "picked_up", label: "Picked Up", icon: "📦" },
+  { key: "in_transit", label: "In Transit", icon: "🚚" },
+  { key: "delivered", label: "Delivered", icon: "✅" },
 ]
 
 export function DeliveryTracker({ selectedDelivery }: DeliveryTrackerProps) {
-  const [deliveryData] = useState<DeliveryData>(() => {
-    // In a real app, you would fetch delivery data based on selectedDelivery
-    return sampleDeliveryData
-  })
+  const [deliveryData, setDeliveryData] = useState<DeliveryData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchDeliveryData = async () => {
+    if (!selectedDelivery) return
+    
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const response = await deliveryApi.getDeliveryTracking(selectedDelivery)
+      setDeliveryData(response)
+    } catch (err) {
+      setError("Failed to fetch delivery data")
+      console.error("Error fetching delivery data:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchDeliveryData()
+  }, [selectedDelivery])
 
   const getStatusIndex = (status: string) => {
     return statusSteps.findIndex((step) => step.key === status)
   }
 
-  const currentStatusIndex = getStatusIndex(deliveryData.status)
+  const currentStatusIndex = deliveryData ? getStatusIndex(deliveryData.status) : -1
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "delivered":
         return "bg-green-500"
-      case "dispatched":
+      case "in_transit":
         return "bg-blue-500"
-      case "preparation":
+      case "picked_up":
         return "bg-yellow-500"
-      case "confirmed":
+      case "pending":
         return "bg-orange-500"
       default:
         return "bg-gray-500"
     }
+  }
+
+  if (!selectedDelivery) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Select a delivery to track</p>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (error || !deliveryData) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+          <p className="text-red-600">{error || "No delivery data found"}</p>
+          <Button onClick={fetchDeliveryData} variant="outline" className="mt-2">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -135,7 +171,12 @@ export function DeliveryTracker({ selectedDelivery }: DeliveryTrackerProps) {
                 <div className="text-center">
                   <MapPin className="h-16 w-16 text-teal-600 mx-auto mb-4" />
                   <p className="text-teal-800 font-medium">Live GPS Tracking</p>
-                  <p className="text-teal-600 text-sm">Delivery route and real-time location</p>
+                  <p className="text-teal-600 text-sm">
+                    {deliveryData.current_location 
+                      ? `Current location: ${deliveryData.current_location.lat.toFixed(4)}, ${deliveryData.current_location.lng.toFixed(4)}`
+                      : "Delivery route and real-time location"
+                    }
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -172,22 +213,30 @@ export function DeliveryTracker({ selectedDelivery }: DeliveryTrackerProps) {
                 <CardTitle className="text-lg">Delivery Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Delivery Agent</span>
-                  <span className="font-medium">{deliveryData.delivery.agent}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Carrier</span>
-                  <span className="font-medium">{deliveryData.delivery.carrier}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Vehicle</span>
-                  <span className="font-medium">{deliveryData.delivery.vehicle}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Contact</span>
-                  <span className="font-medium">{deliveryData.customer.phone}</span>
-                </div>
+                {deliveryData.agent && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Delivery Agent</span>
+                      <span className="font-medium">{deliveryData.agent.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Contact</span>
+                      <span className="font-medium">{deliveryData.agent.phone}</span>
+                    </div>
+                  </>
+                )}
+                {deliveryData.tracking_code && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tracking Code</span>
+                    <span className="font-medium font-mono">{deliveryData.tracking_code}</span>
+                  </div>
+                )}
+                {deliveryData.customer && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Customer Contact</span>
+                    <span className="font-medium">{deliveryData.customer.phone}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -198,57 +247,53 @@ export function DeliveryTracker({ selectedDelivery }: DeliveryTrackerProps) {
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>#{deliveryData.orderId}</CardTitle>
+                <CardTitle>#{deliveryData.order_id}</CardTitle>
                 <Badge className={getStatusColor(deliveryData.status)}>
                   {deliveryData.status.replace("_", " ").toUpperCase()}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="p-4 bg-muted rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <User className="h-4 w-4" />
-                  <span className="font-medium">{deliveryData.customer.name}</span>
+              {deliveryData.customer && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <User className="h-4 w-4" />
+                    <span className="font-medium">{deliveryData.customer.name}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">{deliveryData.customer.address}</p>
                 </div>
-                <p className="text-sm text-muted-foreground mb-3">{deliveryData.customer.address}</p>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Delivery Notes:</p>
-                  <p className="text-sm text-muted-foreground">{deliveryData.customer.notes}</p>
-                </div>
-              </div>
+              )}
 
               <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Requested Date</span>
-                  <span className="font-medium">{deliveryData.delivery.requestedDate}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    ETA
-                  </span>
-                  <span className="font-medium">{deliveryData.delivery.estimatedArrival}</span>
-                </div>
+                {deliveryData.estimated_arrival && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      ETA
+                    </span>
+                    <span className="font-medium">
+                      {new Date(deliveryData.estimated_arrival).toLocaleTimeString()}
+                    </span>
+                  </div>
+                )}
+                {deliveryData.actual_arrival && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Delivered At</span>
+                    <span className="font-medium">
+                      {new Date(deliveryData.actual_arrival).toLocaleTimeString()}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              <div className="pt-4">
-                <h4 className="font-medium mb-3">Order Items</h4>
-                <div className="space-y-2">
-                  {deliveryData.items.map((item, index) => (
-                    <div key={index} className="flex justify-between items-start text-sm">
-                      <div className="flex-1">
-                        <span className="font-medium">{item.name}</span>
-                        {item.notes && <p className="text-muted-foreground text-xs mt-1">{item.notes}</p>}
-                      </div>
-                      <span className="text-muted-foreground ml-2">×{item.quantity}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <Button className="w-full mt-6 bg-transparent" variant="outline">
-                <Phone className="h-4 w-4 mr-2" />
-                Reschedule Delivery
+              <Button 
+                onClick={fetchDeliveryData} 
+                className="w-full mt-6 bg-transparent" 
+                variant="outline"
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Refresh Status
               </Button>
             </CardContent>
           </Card>

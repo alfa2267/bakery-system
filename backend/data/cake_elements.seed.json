@@ -1,0 +1,267 @@
+{
+  "cake_elements": {
+    "flavors": [
+      {
+        "id": "vanilla",
+        "name": "Vanilla",
+        "price_modifier": 0.0,
+        "category": "cake",
+        "description": "Classic vanilla flavor",
+        "is_active": true
+      },
+      {
+        "id": "chocolate",
+        "name": "Chocolate",
+        "price_modifier": 200.0,
+        "category": "cake",
+        "description": "Rich chocolate flavor",
+        "is_active": true
+      },
+      {
+        "id": "strawberry",
+        "name": "Strawberry",
+        "price_modifier": 300.0,
+        "category": "cake",
+        "description": "Fresh strawberry flavor",
+        "is_active": true
+      },
+      {
+        "id": "lemon",
+        "name": "Lemon",
+        "price_modifier": 150.0,
+        "category": "cake",
+        "description": "Zesty lemon flavor",
+        "is_active": true
+      },
+      {
+        "id": "coffee",
+        "name": "Coffee",
+        "price_modifier": 250.0,
+        "category": "cake",
+        "description": "Rich coffee flavor",
+        "is_active": true
+      },
+      {
+        "id": "almond",
+        "name": "Almond",
+        "price_modifier": 400.0,
+        "category": "cake",
+        "description": "Nutty almond flavor",
+        "is_active": true
+      },
+      {
+        "id": "coconut",
+        "name": "Coconut",
+        "price_modifier": 350.0,
+        "category": "cake",
+        "description": "Tropical coconut flavor",
+        "is_active": true
+      }
+    ],
+    "icing_types": [
+      {
+        "id": "buttercream",
+        "name": "Buttercream",
+        "price_modifier": 0.0,
+        "description": "Classic buttercream frosting",
+        "is_active": true
+      },
+      {
+        "id": "cream_cheese",
+        "name": "Cream Cheese",
+        "price_modifier": 150.0,
+        "description": "Tangy cream cheese frosting",
+        "is_active": true
+      },
+      {
+        "id": "ganache",
+        "name": "Ganache",
+        "price_modifier": 200.0,
+        "description": "Smooth chocolate ganache",
+        "is_active": true
+      },
+      {
+        "id": "fondant",
+        "name": "Fondant",
+        "price_modifier": 500.0,
+        "description": "Smooth fondant icing",
+        "is_active": true
+      },
+      {
+        "id": "whipped_cream",
+        "name": "Whipped Cream",
+        "price_modifier": 100.0,
+        "description": "Light whipped cream",
+        "is_active": true
+      },
+      {
+        "id": "royal_icing",
+        "name": "Royal Icing",
+        "price_modifier": 300.0,
+        "description": "Hard royal icing for decorations",
+        "is_active": true
+      }
+    ],
+    "filling_types": [
+      {
+        "id": "none",
+        "name": "No Filling",
+        "price_modifier": 0.0,
+        "description": "No additional filling",
+        "is_active": true
+      },
+      {
+        "id": "fruit",
+        "name": "Fruit Filling",
+        "price_modifier": 300.0,
+        "description": "Fresh fruit filling",
+        "is_active": true
+      },
+      {
+        "id": "chocolate",
+        "name": "Chocolate Filling",
+        "price_modifier": 250.0,
+        "description": "Rich chocolate filling",
+        "is_active": true
+      },
+      {
+        "id": "caramel",
+        "name": "Caramel Filling",
+        "price_modifier": 200.0,
+        "description": "Sweet caramel filling",
+        "is_active": true
+      },
+      {
+        "id": "cream",
+        "name": "Cream Filling",
+        "price_modifier": 150.0,
+        "description": "Light cream filling",
+        "is_active": true
+      },
+      {
+        "id": "jam",
+        "name": "Jam Filling",
+        "price_modifier": 100.0,
+        "description": "Sweet jam filling",
+        "is_active": true
+      },
+      {
+        "id": "custard",
+        "name": "Custard Filling",
+        "price_modifier": 180.0,
+        "description": "Rich custard filling",
+        "is_active": true
+      }
+    ],
+    "color_schemes": [
+      {
+        "id": "pink_gold",
+        "name": "Pink & Gold",
+        "colors": ["#FFB6C1", "#FFD700"],
+        "description": "Elegant pink and gold combination",
+        "is_active": true
+      },
+      {
+        "id": "blue_silver",
+        "name": "Blue & Silver",
+        "colors": ["#4169E1", "#C0C0C0"],
+        "description": "Sophisticated blue and silver",
+        "is_active": true
+      },
+      {
+        "id": "rainbow",
+        "name": "Rainbow",
+        "colors": ["#FF0000", "#FF7F00", "#FFFF00", "#00FF00", "#0000FF", "#4B0082", "#9400D3"],
+        "description": "Vibrant rainbow colors",
+        "is_active": true
+      },
+      {
+        "id": "pastel",
+        "name": "Pastel",
+        "colors": ["#FFB3BA", "#BAFFC9", "#BAE1FF", "#FFFFBA"],
+        "description": "Soft pastel colors",
+        "is_active": true
+      },
+      {
+        "id": "elegant",
+        "name": "Elegant",
+        "colors": ["#000000", "#FFFFFF", "#808080"],
+        "description": "Classic black, white, and gray",
+        "is_active": true
+      },
+      {
+        "id": "sunset",
+        "name": "Sunset",
+        "colors": ["#FF6B35", "#F7931E", "#FFD23F"],
+        "description": "Warm sunset colors",
+        "is_active": true
+      }
+    ],
+    "toppings": [
+      {
+        "id": "fresh_fruits",
+        "name": "Fresh Fruits",
+        "price_modifier": 400.0,
+        "description": "Assorted fresh fruits",
+        "category": "fruits",
+        "is_active": true
+      },
+      {
+        "id": "chocolate_chips",
+        "name": "Chocolate Chips",
+        "price_modifier": 150.0,
+        "description": "Mini chocolate chips",
+        "category": "chocolate",
+        "is_active": true
+      },
+      {
+        "id": "sprinkles",
+        "name": "Sprinkles",
+        "price_modifier": 100.0,
+        "description": "Colorful sprinkles",
+        "category": "decorations",
+        "is_active": true
+      },
+      {
+        "id": "nuts",
+        "name": "Mixed Nuts",
+        "price_modifier": 300.0,
+        "description": "Assorted nuts",
+        "category": "nuts",
+        "is_active": true
+      },
+      {
+        "id": "edible_flowers",
+        "name": "Edible Flowers",
+        "price_modifier": 500.0,
+        "description": "Beautiful edible flowers",
+        "category": "decorations",
+        "is_active": true
+      },
+      {
+        "id": "gold_leaf",
+        "name": "Gold Leaf",
+        "price_modifier": 800.0,
+        "description": "Luxurious gold leaf",
+        "category": "decorations",
+        "is_active": true
+      },
+      {
+        "id": "caramel_drizzle",
+        "name": "Caramel Drizzle",
+        "price_modifier": 200.0,
+        "description": "Sweet caramel drizzle",
+        "category": "sauces",
+        "is_active": true
+      },
+      {
+        "id": "chocolate_sauce",
+        "name": "Chocolate Sauce",
+        "price_modifier": 180.0,
+        "description": "Rich chocolate sauce",
+        "category": "sauces",
+        "is_active": true
+      }
+    ]
+  }
+}

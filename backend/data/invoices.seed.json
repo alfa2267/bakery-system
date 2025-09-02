@@ -1,0 +1,133 @@
+{
+  "invoices": [
+    {
+      "id": "INV-2024-001",
+      "order_id": "ORD-2024-001",
+      "customer_id": 1,
+      "invoice_number": "INV-2024-001",
+      "invoice_date": "2024-03-20T14:35:00Z",
+      "due_date": "2024-03-25T00:00:00Z",
+      "subtotal": 8000.0,
+      "tax_amount": 0.0,
+      "delivery_fee": 500.0,
+      "payment_fee": 0.0,
+      "discount_amount": 0.0,
+      "total_amount": 8500.0,
+      "amount_paid": 8500.0,
+      "balance_due": 0.0,
+      "payment_status": "paid",
+      "payment_method": "card",
+      "payment_reference": "PAY-REF-001",
+      "notes": "Payment received via card",
+      "is_active": true,
+      "created_at": "2024-03-20T14:35:00Z",
+      "updated_at": "2024-03-20T14:35:00Z",
+      "items": [
+        {
+          "id": 1,
+          "invoice_id": "INV-2024-001",
+          "item_name": "Chocolate Chip Cookies",
+          "quantity": 2,
+          "unit_price": 500.0,
+          "total_price": 1000.0,
+          "description": "Classic chocolate chip cookies"
+        },
+        {
+          "id": 2,
+          "invoice_id": "INV-2024-001",
+          "item_name": "Custom Vanilla Cake",
+          "quantity": 1,
+          "unit_price": 7000.0,
+          "total_price": 7000.0,
+          "description": "Vanilla sponge cake with buttercream icing, round shape, medium size, pink & gold colors, sprinkles topping, custom message: 'Happy Birthday Sarah!'"
+        }
+      ]
+    },
+    {
+      "id": "INV-2024-002",
+      "order_id": "ORD-2024-002",
+      "customer_id": 2,
+      "invoice_number": "INV-2024-002",
+      "invoice_date": "2024-03-21T10:20:00Z",
+      "due_date": "2024-03-26T00:00:00Z",
+      "subtotal": 11500.0,
+      "tax_amount": 0.0,
+      "delivery_fee": 500.0,
+      "payment_fee": 0.0,
+      "discount_amount": 0.0,
+      "total_amount": 12000.0,
+      "amount_paid": 12000.0,
+      "balance_due": 0.0,
+      "payment_status": "paid",
+      "payment_method": "transfer",
+      "payment_reference": "PAY-REF-002",
+      "notes": "Payment received via bank transfer",
+      "is_active": true,
+      "created_at": "2024-03-21T10:20:00Z",
+      "updated_at": "2024-03-21T10:25:00Z",
+      "items": [
+        {
+          "id": 3,
+          "invoice_id": "INV-2024-002",
+          "item_name": "Custom Chocolate Cake",
+          "quantity": 1,
+          "unit_price": 11500.0,
+          "total_price": 11500.0,
+          "description": "Chocolate fudge cake with ganache icing, chocolate filling, round shape, large size, elegant colors, chocolate chips and gold leaf toppings, custom message: 'Congratulations on your promotion!'"
+        }
+      ]
+    },
+    {
+      "id": "INV-2024-003",
+      "order_id": "ORD-2024-003",
+      "customer_id": 3,
+      "invoice_number": "INV-2024-003",
+      "invoice_date": "2024-03-22T16:45:00Z",
+      "due_date": "2024-03-24T00:00:00Z",
+      "subtotal": 4200.0,
+      "tax_amount": 0.0,
+      "delivery_fee": 300.0,
+      "payment_fee": 0.0,
+      "discount_amount": 0.0,
+      "total_amount": 4500.0,
+      "amount_paid": 0.0,
+      "balance_due": 4500.0,
+      "payment_status": "pending",
+      "payment_method": "cash",
+      "payment_reference": null,
+      "notes": "Payment to be collected on pickup",
+      "is_active": true,
+      "created_at": "2024-03-22T16:45:00Z",
+      "updated_at": "2024-03-22T16:45:00Z",
+      "items": [
+        {
+          "id": 4,
+          "invoice_id": "INV-2024-003",
+          "item_name": "Brownies",
+          "quantity": 3,
+          "unit_price": 800.0,
+          "total_price": 2400.0,
+          "description": "Rich chocolate brownies"
+        },
+        {
+          "id": 5,
+          "invoice_id": "INV-2024-003",
+          "item_name": "Croissants",
+          "quantity": 2,
+          "unit_price": 600.0,
+          "total_price": 1200.0,
+          "description": "Buttery French croissants"
+        },
+        {
+          "id": 6,
+          "invoice_id": "INV-2024-003",
+          "item_name": "Cupcakes",
+          "quantity": 1,
+          "unit_price": 600.0,
+          "total_price": 600.0,
+          "description": "Assorted cupcakes"
+        }
+      ]
+    }
+  ]
+}

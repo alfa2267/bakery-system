@@ -52,14 +52,14 @@ export function RecipeManager() {
     };
     setCurrentRecipe(prev => ({
       ...prev,
-      steps: [...prev.steps, newStep]
+      steps: [...(prev.steps || []), newStep]
     }));
     setEditingStep(newStep);
-    setStepIndex(currentRecipe.steps.length);
+    setStepIndex((currentRecipe.steps || []).length);
   };
 
   const updateStep = (index: number, step: RecipeStep) => {
-    const updatedSteps = [...currentRecipe.steps];
+    const updatedSteps = [...(currentRecipe.steps || [])];
     updatedSteps[index] = step;
     setCurrentRecipe(prev => ({
       ...prev,
@@ -72,12 +72,12 @@ export function RecipeManager() {
   const deleteStep = (index: number) => {
     setCurrentRecipe(prev => ({
       ...prev,
-      steps: prev.steps.filter((_, i) => i !== index)
+      steps: (prev.steps || []).filter((_, i) => i !== index)
     }));
   };
 
   const saveRecipe = async () => {
-    if (!currentRecipe.productType || currentRecipe.steps.length === 0) {
+    if (!currentRecipe.productType || (currentRecipe.steps || []).length === 0) {
       return;
     }
 
@@ -130,16 +130,16 @@ export function RecipeManager() {
               {recipes.map((recipe, index) => (
                 <div key={index} className="border rounded-lg p-4 space-y-2">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">{recipe.productType}</h3>
+                    <h3 className="font-semibold">{recipe.productType || recipe.product}</h3>
                     <Badge variant="outline">
-                      {recipe.steps.length} steps
+                      {recipe.steps?.length || 0} steps
                     </Badge>
                   </div>
                   <div className="text-sm text-gray-600">
-                    <p>Duration: {formatDuration(getTotalDuration(recipe.steps))}</p>
+                    <p>Duration: {formatDuration(getTotalDuration(recipe.steps || []))}</p>
                     <p>Batch Size: {recipe.minBatchSize}-{recipe.maxBatchSize}</p>
                     {recipe.requiresChilling && (
-                      <p>Chilling: Up to {recipe.maxChillTime} minutes</p>
+                      <p>Chilling: Up to {recipe.maxChillTime || 0} minutes</p>
                     )}
                   </div>
                   <div className="flex gap-2">
@@ -241,7 +241,7 @@ export function RecipeManager() {
               </div>
 
               <div className="space-y-3">
-                {currentRecipe.steps.map((step, index) => (
+                {(currentRecipe.steps || []).map((step, index) => (
                   <div key={index} className="border rounded-lg p-3 space-y-3">
                     <div className="flex items-center justify-between">
                       <h4 className="font-medium">Step {index + 1}</h4>
@@ -290,7 +290,7 @@ export function RecipeManager() {
 
             <Button 
               onClick={saveRecipe} 
-              disabled={!currentRecipe.productType || currentRecipe.steps.length === 0 || loading}
+              disabled={!currentRecipe.productType || (currentRecipe.steps || []).length === 0 || loading}
               className="w-full"
             >
               <Save className="h-4 w-4 mr-2" />

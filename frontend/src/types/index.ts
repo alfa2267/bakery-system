@@ -131,13 +131,15 @@ export interface DailyScheduleSummary {
 
 // Recipe-related interfaces
 export interface Recipe {
-  id: string;
-  productType: string;
-  steps: RecipeStep[];
-  requiresChilling: boolean;
-  maxChillTime: number;
-  minBatchSize: number;
-  maxBatchSize: number;
+  id?: string;
+  productType?: string;
+  product?: string; // For API compatibility
+  steps?: RecipeStep[];
+  requiresChilling?: boolean;
+  maxChillTime?: number;
+  minBatchSize?: number;
+  maxBatchSize?: number;
+  totalProductionTime?: number; // From API
 }
 
 export interface RecipeStep {
@@ -214,6 +216,7 @@ export interface ProductOption {
   name: string
   multiplier?: number
   additionalCost?: number
+  type?: 'size' | 'flavor' | 'icing' | 'topping'
 }
 
 export interface ProductConfig {

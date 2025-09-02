@@ -20,6 +20,7 @@ from .config import settings
 from .database import get_db, verify_db_connection, init_db
 from .repository import OrderRepository
 from .cake_configurator import CakeConfiguratorService
+from .delivery_service import DeliveryService
 
 # Set up logging
 logging.basicConfig(
@@ -410,3 +411,105 @@ async def initialize_cake_configurator_data(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error initializing sample data: {str(e)}")
         raise HTTPException(status_code=500, detail="Could not initialize sample data")
+
+# Delivery Management Endpoints
+@app.get("/delivery/zones")
+async def get_delivery_zones(db: Session = Depends(get_db)):
+    """Get all delivery zones"""
+    try:
+        service = DeliveryService(db)
+        zones = service.db.query(service.DeliveryZone).filter(service.DeliveryZone.is_active == True).all()
+        return {"zones": zones}
+    except Exception as e:
+        logger.error(f"Error fetching delivery zones: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not fetch delivery zones")
+
+@app.post("/delivery/zones")
+async def create_delivery_zone(
+    name: str,
+    description: str = None,
+    color: str = None,
+    boundaries: Dict = None,
+    db: Session = Depends(get_db)
+):
+    """Create a new delivery zone"""
+    try:
+        service = DeliveryService(db)
+        zone = service.create_delivery_zone(name, description, color, boundaries)
+        return {"zone": zone}
+    except Exception as e:
+        logger.error(f"Error creating delivery zone: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not create delivery zone")
+
+@app.get("/delivery/slots/{date}")
+async def get_delivery_slots(
+    date: str,
+    zone_id: int = None,
+    db: Session = Depends(get_db)
+):
+    """Get available delivery slots for a specific date"""
+    try:
+        service = DeliveryService(db)
+        slots = service.get_available_delivery_slots(date, zone_id)
+        return {"slots": slots}
+    except Exception as e:
+        logger.error(f"Error fetching delivery slots: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not fetch delivery slots")
+
+@app.get("/delivery/tracking/{order_id}")
+async def track_delivery(order_id: str, db: Session = Depends(get_db)):
+    """Track delivery status for an order"""
+    try:
+        service = DeliveryService(db)
+        tracking_info = service.track_delivery(order_id)
+        return tracking_info
+    except Exception as e:
+        logger.error(f"Error tracking delivery: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not track delivery")
+
+@app.put("/delivery/tracking/{order_id}")
+async def update_delivery_status(
+    order_id: str,
+    status: str,
+    location: Dict = None,
+    db: Session = Depends(get_db)
+):
+    """Update delivery status and location"""
+    try:
+        service = DeliveryService(db)
+        success = service.update_delivery_status(order_id, status, location)
+        return {"success": success}
+    except Exception as e:
+        logger.error(f"Error updating delivery status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not update delivery status")
+
+@app.get("/delivery/analytics")
+async def get_delivery_analytics(
+    start_date: str,
+    end_date: str,
+    db: Session = Depends(get_db)
+):
+    """Get delivery analytics and performance metrics"""
+    try:
+        service = DeliveryService(db)
+        analytics = service.get_delivery_analytics(start_date, end_date)
+        return analytics
+    except Exception as e:
+        logger.error(f"Error fetching delivery analytics: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not fetch delivery analytics")
+
+@app.post("/delivery/routes")
+async def create_delivery_route(
+    agent_id: int,
+    date: str,
+    orders: List[str],
+    db: Session = Depends(get_db)
+):
+    """Create an optimized delivery route"""
+    try:
+        service = DeliveryService(db)
+        route = service.create_delivery_route(agent_id, date, orders)
+        return {"route": route}
+    except Exception as e:
+        logger.error(f"Error creating delivery route: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not create delivery route")

@@ -37,7 +37,14 @@ const CustomizationForm: React.FC<CustomizationFormProps> = ({
   // Load available options when product changes
   useEffect(() => {
     const options = pricingEngine.getAvailableOptions(item.product);
-    setAvailableOptions(options);
+    // Transform the flat array into categorized options
+    const categorizedOptions = {
+      sizes: options.filter(opt => opt.type === 'size'),
+      flavors: options.filter(opt => opt.type === 'flavor'),
+      icings: options.filter(opt => opt.type === 'icing'),
+      toppings: options.filter(opt => opt.type === 'topping')
+    };
+    setAvailableOptions(categorizedOptions);
   }, [item.product]);
 
   // Update pricing when item changes

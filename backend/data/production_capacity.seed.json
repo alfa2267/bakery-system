@@ -1,0 +1,70 @@
+{
+  "production_capacity": [
+    {
+      "id": 1,
+      "product_type": "cookies",
+      "max_daily_capacity": 500,
+      "batch_size": 24,
+      "processing_time_minutes": 45,
+      "required_equipment": ["mixer", "oven"],
+      "priority_level": 3,
+      "is_active": true,
+      "notes": "High demand product"
+    },
+    {
+      "id": 2,
+      "product_type": "brownies",
+      "max_daily_capacity": 200,
+      "batch_size": 36,
+      "processing_time_minutes": 55,
+      "required_equipment": ["mixer", "oven"],
+      "priority_level": 4,
+      "is_active": true,
+      "notes": "Popular item"
+    },
+    {
+      "id": 3,
+      "product_type": "croissants",
+      "max_daily_capacity": 150,
+      "batch_size": 24,
+      "processing_time_minutes": 180,
+      "required_equipment": ["mixer", "oven"],
+      "priority_level": 5,
+      "is_active": true,
+      "notes": "Complex preparation"
+    },
+    {
+      "id": 4,
+      "product_type": "bread",
+      "max_daily_capacity": 100,
+      "batch_size": 12,
+      "processing_time_minutes": 240,
+      "required_equipment": ["mixer", "oven"],
+      "priority_level": 2,
+      "is_active": true,
+      "notes": "Daily staple"
+    },
+    {
+      "id": 5,
+      "product_type": "cakes",
+      "max_daily_capacity": 50,
+      "batch_size": 1,
+      "processing_time_minutes": 120,
+      "required_equipment": ["mixer", "oven", "decorating_station"],
+      "priority_level": 5,
+      "is_active": true,
+      "notes": "Custom orders"
+    },
+    {
+      "id": 6,
+      "product_type": "cupcakes",
+      "max_daily_capacity": 300,
+      "batch_size": 24,
+      "processing_time_minutes": 90,
+      "required_equipment": ["mixer", "oven", "decorating_station"],
+      "priority_level": 4,
+      "is_active": true,
+      "notes": "Popular for events"
+    }
+  ]
+}

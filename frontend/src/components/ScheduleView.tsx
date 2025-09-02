@@ -160,7 +160,7 @@ const ConsolidatedScheduleView: React.FC = () => {
 
         setOrders(ordersData || []);
         setScheduledTasks(scheduleData.schedule || scheduleData);
-        setBakerTasks(tasksData.items || []);
+        setBakerTasks(tasksData.tasks || []);
         
         // Generate task instances from scheduled tasks
         const instances: TaskInstance[] = scheduleData.schedule?.map((task, index) => {

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs"
 import { 
   Clock, 
   AlertTriangle, 
@@ -215,20 +214,9 @@ export function UnifiedKOT({ defaultView = 'manager', workstation = 'oven_main',
         </Card>
       </div>
 
-      <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'manager' | 'workstation')}>
-        <TabsList className="grid w-48 grid-cols-2">
-          <TabsTrigger value="manager" className="flex items-center gap-1 text-xs">
-            <Users className="h-3 w-3" />
-            Manager
-          </TabsTrigger>
-          <TabsTrigger value="workstation" className="flex items-center gap-1 text-xs">
-            <Factory className="h-3 w-3" />
-            Workstation
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Manager View */}
-        <TabsContent value="manager" className="space-y-6">
+      {activeView === 'manager' ? (
+        <div className="space-y-6">
+          {/* Manager View */}
           {/* Workstation Overview */}
           <Card>
             <CardHeader>
@@ -290,10 +278,10 @@ export function UnifiedKOT({ defaultView = 'manager', workstation = 'oven_main',
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Workstation View */}
-        <TabsContent value="workstation" className="space-y-6">
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Workstation View */}
           {/* Workstation Selection */}
           <Card>
             <CardHeader>
@@ -391,8 +379,8 @@ export function UnifiedKOT({ defaultView = 'manager', workstation = 'oven_main',
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
     </div>
   )
 }

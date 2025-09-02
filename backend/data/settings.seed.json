@@ -1,0 +1,200 @@
+{
+  "bakery": {
+    "name": "Oceanias Bakery",
+    "address": "123 Main Street, Lagos, Nigeria",
+    "phone": "+234 123 456 7890",
+    "email": "info@oceaniasbakery.com",
+    "website": "https://oceaniasbakery.com"
+  },
+  "operating_hours": [
+    {
+      "id": 1,
+      "day_of_week": "monday",
+      "open_time": "06:00",
+      "close_time": "20:00",
+      "is_open": true,
+      "notes": "Regular business hours"
+    },
+    {
+      "id": 2,
+      "day_of_week": "tuesday",
+      "open_time": "06:00",
+      "close_time": "20:00",
+      "is_open": true,
+      "notes": "Regular business hours"
+    },
+    {
+      "id": 3,
+      "day_of_week": "wednesday",
+      "open_time": "06:00",
+      "close_time": "20:00",
+      "is_open": true,
+      "notes": "Regular business hours"
+    },
+    {
+      "id": 4,
+      "day_of_week": "thursday",
+      "open_time": "06:00",
+      "close_time": "20:00",
+      "is_open": true,
+      "notes": "Regular business hours"
+    },
+    {
+      "id": 5,
+      "day_of_week": "friday",
+      "open_time": "06:00",
+      "close_time": "22:00",
+      "is_open": true,
+      "notes": "Extended hours for weekend rush"
+    },
+    {
+      "id": 6,
+      "day_of_week": "saturday",
+      "open_time": "07:00",
+      "close_time": "22:00",
+      "is_open": true,
+      "notes": "Weekend hours"
+    },
+    {
+      "id": 7,
+      "day_of_week": "sunday",
+      "open_time": "08:00",
+      "close_time": "18:00",
+      "is_open": true,
+      "notes": "Reduced Sunday hours"
+    }
+  ],
+  "production_settings": {
+    "default_batch_size": 12,
+    "max_batch_size": 100,
+    "min_order_lead_time_hours": 24,
+    "max_order_lead_time_days": 7,
+    "default_baking_temperature": 180,
+    "default_baking_time_minutes": 30,
+    "chilling_required_products": ["cookies", "croissants", "pastries"],
+    "freezing_required_products": ["ice_cream_cakes", "frozen_desserts"]
+  },
+  "delivery_settings": {
+    "delivery_radius_km": 25,
+    "delivery_fee_base": 500,
+    "delivery_fee_per_km": 50,
+    "free_delivery_threshold": 5000,
+    "delivery_slots": [
+      {
+        "name": "Morning",
+        "start_time": "08:00",
+        "end_time": "12:00",
+        "price_modifier": 1.0
+      },
+      {
+        "name": "Afternoon",
+        "start_time": "12:00",
+        "end_time": "16:00",
+        "price_modifier": 1.1
+      },
+      {
+        "name": "Evening",
+        "start_time": "16:00",
+        "end_time": "20:00",
+        "price_modifier": 1.2
+      }
+    ]
+  },
+  "staff_settings": {
+    "bakers": [
+      {
+        "name": "John Doe",
+        "role": "Head Baker",
+        "shift": "morning",
+        "skills": ["bread", "pastries", "cakes"]
+      },
+      {
+        "name": "Jane Smith",
+        "role": "Baker",
+        "shift": "afternoon",
+        "skills": ["cookies", "brownies", "decorations"]
+      }
+    ],
+    "delivery_staff": [
+      {
+        "name": "Mike Johnson",
+        "vehicle": "motorcycle",
+        "area": "north"
+      },
+      {
+        "name": "Sarah Wilson",
+        "vehicle": "van",
+        "area": "south"
+      }
+    ]
+  },
+  "equipment_settings": {
+    "ovens": [
+      {
+        "name": "Main Oven",
+        "type": "convection",
+        "capacity": "large",
+        "temperature_range": [50, 250],
+        "maintenance_schedule": "weekly"
+      },
+      {
+        "name": "Secondary Oven",
+        "type": "conventional",
+        "capacity": "medium",
+        "temperature_range": [50, 200],
+        "maintenance_schedule": "weekly"
+      }
+    ],
+    "mixers": [
+      {
+        "name": "Mixer 1",
+        "type": "planetary",
+        "capacity": "20L",
+        "maintenance_schedule": "monthly"
+      },
+      {
+        "name": "Mixer 2",
+        "type": "spiral",
+        "capacity": "15L",
+        "maintenance_schedule": "monthly"
+      }
+    ],
+    "workstations": [
+      {
+        "name": "Prep Station Alpha",
+        "type": "preparation",
+        "equipment": ["scales", "measuring_cups", "mixing_bowls"]
+      },
+      {
+        "name": "Packaging Station",
+        "type": "packaging",
+        "equipment": ["boxes", "bags", "ribbons"]
+      }
+    ]
+  },
+  "quality_settings": {
+    "ingredient_standards": {
+      "flour": "premium_all_purpose",
+      "sugar": "refined_white",
+      "butter": "unsalted_premium",
+      "eggs": "farm_fresh"
+    },
+    "storage_conditions": {
+      "dry_ingredients": {
+        "temperature": "room",
+        "humidity": "low",
+        "shelf_life_days": 180
+      },
+      "refrigerated": {
+        "temperature": "2-4°C",
+        "humidity": "medium",
+        "shelf_life_days": 7
+      },
+      "frozen": {
+        "temperature": "-18°C",
+        "humidity": "low",
+        "shelf_life_days": 90
+      }
+    }
+  }
+}

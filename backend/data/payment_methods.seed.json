@@ -1,0 +1,39 @@
+{
+  "payment_methods": [
+    {
+      "id": "cash",
+      "name": "Cash on Delivery",
+      "icon": "💵",
+      "is_active": true,
+      "processing_fee": 0.0
+    },
+    {
+      "id": "card",
+      "name": "Credit/Debit Card",
+      "icon": "💳",
+      "is_active": true,
+      "processing_fee": 50.0
+    },
+    {
+      "id": "transfer",
+      "name": "Bank Transfer",
+      "icon": "🏦",
+      "is_active": true,
+      "processing_fee": 25.0
+    },
+    {
+      "id": "paystack",
+      "name": "Paystack",
+      "icon": "📱",
+      "is_active": true,
+      "processing_fee": 100.0
+    },
+    {
+      "id": "flutterwave",
+      "name": "Flutterwave",
+      "icon": "💸",
+      "is_active": true,
+      "processing_fee": 100.0
+    }
+  ]
+}

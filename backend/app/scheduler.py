@@ -120,10 +120,26 @@ class BakeryScheduler:
         """Return list of available products and their constraints"""
         available_products = [
             {
+                "id": product_type,
+                "productType": product_type,
                 "product": product_type,
+                "steps": [
+                    {
+                        "id": f"{product_type}-step-{i}",
+                        "name": step.name,
+                        "duration": step.duration,
+                        "requiresHuman": step.requiresHuman,
+                        "requiresOven": step.requiresOven,
+                        "requiresMixer": step.requiresMixer,
+                        "mustFollowImmediately": step.mustFollowImmediately,
+                        "scalingFactor": step.scalingFactor
+                    }
+                    for i, step in enumerate(recipe.steps)
+                ],
                 "minBatchSize": recipe.minBatchSize,
                 "maxBatchSize": recipe.maxBatchSize,
                 "requiresChilling": recipe.requiresChilling,
+                "maxChillTime": recipe.maxChillTime if hasattr(recipe, 'maxChillTime') else 0,
                 "totalProductionTime": sum(step.duration for step in recipe.steps)
             }
             for product_type, recipe in self.recipes.items()
