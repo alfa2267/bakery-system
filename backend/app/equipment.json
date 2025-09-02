@@ -1,0 +1,39 @@
+
+{ 
+    "equipment": [ {
+        "id": 1,
+        "name": "oven",
+        "quantity": 2,
+        "can_be_shared": true
+    },
+    {
+        "id": 2,
+        "name": "mixer",
+        "quantity": 3,
+        "can_be_shared": false
+    },
+    {
+        "id": 3,
+        "name": "proofer",
+        "quantity": 1,
+        "can_be_shared": true
+    },
+    {
+        "id": 4,
+        "name": "refrigerator",
+        "quantity": 2,
+        "can_be_shared": true
+    },
+    {
+        "id": 5,
+        "name": "freezer",
+        "quantity": 1,
+        "can_be_shared": true
+    },
+    {
+        "id": 6,
+        "name": "work_station",
+        "quantity": 4,
+        "can_be_shared": true
+    }]
+}

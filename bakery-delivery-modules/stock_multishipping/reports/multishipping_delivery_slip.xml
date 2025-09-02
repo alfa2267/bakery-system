@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+
+    <report
+            string="Multishipping Delivery Slip"
+            id="action_report_delivery_multishipping"
+            model="stock.picking"
+            report_type="qweb-pdf"
+            name="stock_multishipping.report_delivery_slip_multishipping"
+            file="stock_multishipping.report_delivery_slip_multishipping"
+            print_report_name="'Delivery Slip - %s - %s' % (object.partner_id.name or '', object.name)"
+    />
+
+    <template id="report_delivery_slip_multishipping">
+        <t t-foreach="docs" t-as="data">
+            <t t-call="stock_multishipping.report_delivery_slip_multishipping_document" t-lang="data.partner_id.lang"/>
+        </t>
+    </template>
+
+    <template id="report_delivery_slip_multishipping_document">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <t t-set="data" t-value="data.with_context(lang=data.partner_id.lang)"/>
+                <t t-foreach="data.x_multishipping_id" t-as="o">
+                    <div class="page" style="page-break-after:always;">
+                        <h2>
+                            <span t-field="o.name"/>
+                        </h2>
+                        <div class="row">
+                            <div class="col-5">
+                                <div t-if="o.x_origin" class="col-auto">
+                                    <strong>Order:</strong>
+                                    <p t-field="o.x_origin"/>
+                                </div>
+                            </div>
+                            <div class="col-5 offset-2 address">
+                                <div t-field="o.x_address_id" t-options-widget="'contact'"/>
+                            </div>
+                        </div>
+
+                        <table class="table table-sm" name="stock_move_table_multishipping">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <strong>Product</strong>
+                                    </th>
+                                    <th>
+                                        <strong>Quantity</strong>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="lines"
+                                   t-value="o.x_product_lines.filtered(lambda x: x.x_quantity)"/>
+                                <tr t-foreach="lines" t-as="move">
+                                    <td>
+                                        <span t-field="move.x_product_id"/>
+                                        <p t-if="o.x_picking_id.picking_type_code == 'outgoing'">
+                                            <span t-field="move.x_product_id.sudo().description_pickingout"/>
+                                        </p>
+                                    </td>
+                                    <td>
+                                        <span t-field="move.x_quantity"/>
+                                        <span t-field="move.x_product_id.uom_id"/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <!--                        <table class="table table-sm mt48" t-if="o.move_line_ids and o.state=='done'"-->
+                        <!--                               name="stock_move_line_table">-->
+                        <!--                            <t t-set="has_serial_number" t-value="o.move_line_ids.mapped('lot_id')"/>-->
+                        <!--                            <thead>-->
+                        <!--                                <tr>-->
+                        <!--                                    <th>-->
+                        <!--                                        <strong>Product</strong>-->
+                        <!--                                    </th>-->
+                        <!--                                    <th name="lot_serial" t-if="has_serial_number"-->
+                        <!--                                        groups="stock.group_lot_on_delivery_slip">-->
+                        <!--                                        Lot/Serial Number-->
+                        <!--                                    </th>-->
+                        <!--                                    <th class="text-center">-->
+                        <!--                                        <strong>Quantity</strong>-->
+                        <!--                                    </th>-->
+                        <!--                                </tr>-->
+                        <!--                            </thead>-->
+                        <!--                            <tbody>-->
+                        <!--                                <tr t-foreach="o.move_line_ids" t-as="move_line">-->
+                        <!--                                    <td>-->
+                        <!--                                        <span t-field="move_line.product_id"/>-->
+                        <!--                                        <p t-if="o.picking_type_code == 'outgoing'">-->
+                        <!--                                            <span t-field="move_line.product_id.sudo().description_pickingout"/>-->
+                        <!--                                        </p>-->
+                        <!--                                        <p t-if="o.picking_type_code == 'incoming'">-->
+                        <!--                                            <span t-field="move_line.product_id.sudo().description_pickingin"/>-->
+                        <!--                                        </p>-->
+                        <!--                                    </td>-->
+                        <!--                                    <td t-if="has_serial_number and move_line.lot_name"-->
+                        <!--                                        groups="stock.group_lot_on_delivery_slip">-->
+                        <!--                                        <span t-field="move_line.lot_name"/>-->
+                        <!--                                    </td>-->
+                        <!--                                    <td t-elif="has_serial_number" groups="stock.group_lot_on_delivery_slip">-->
+                        <!--                                        <span t-field="move_line.lot_id.name"/>-->
+                        <!--                                    </td>-->
+                        <!--                                    <td class="text-center">-->
+                        <!--                                        <span t-field="move_line.qty_done"/>-->
+                        <!--                                        <span t-field="move_line.uom_id_id"/>-->
+                        <!--                                    </td>-->
+                        <!--                                </tr>-->
+                        <!--                            </tbody>-->
+                        <!--                        </table>-->
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

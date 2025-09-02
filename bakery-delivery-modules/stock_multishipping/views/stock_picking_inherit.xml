@@ -1,0 +1,23 @@
+<odoo>
+    <data>
+        <record id="glove_stock_picking_form_inherit" model="ir.ui.view">
+            <field name="name">stock.form.inherit</field>
+            <field name="model">stock.picking</field>
+            <field name="inherit_id" ref="stock.view_picking_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='origin']" position="after">
+                   <field name="x_ship_to_multiple_locations"/>
+                </xpath>
+
+                <xpath expr="//page[@name='note']" position="after">
+                    <page string="Multi Shipping Addresses" name="multishipping_addresses"
+                          attrs="{'invisible': [('x_ship_to_multiple_locations', '=', False)]}">
+                        <group>
+                            <field name="x_multishipping_id"/>
+                        </group>
+                    </page>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

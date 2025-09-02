@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="stock_multishipping_search_form_view" model="ir.ui.view">
+        <field name="name">stock.multishipping.search.form</field>
+        <field name="model">stock.multishipping</field>
+        <field name="arch" type="xml">
+            <search string="Shipments">
+                <field name="name"/>
+                <field name="x_picking_id"/>
+                <field name="x_partner_id"/>
+                <field name="x_address_id"/>
+                <field name="x_product_lines"/>
+            </search>
+        </field>
+    </record>
+
+    <act_window
+            id="action_open_single_stock_multishipping"
+            name="Multishipping"
+            res_model="stock.multishipping"
+            view_mode="form,tree"
+            target="current"/>
+
+    <record id="view_stock_multishipping_form" model="ir.ui.view">
+        <field name="name">stock.multishipping.form</field>
+        <field name="model">stock.multishipping</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Multishipping" nolabel="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="x_picking_id" widget="many2one" invisible="True"/>
+                            <field name="x_partner_id" widget="many2one"/>
+                            <field name="x_address_id" widget="many2one"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="x_product_lines"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_stock_multishipping_tree" model="ir.ui.view">
+        <field name="name">stock.multishipping.tree</field>
+        <field name="model">stock.multishipping</field>
+        <field name="arch" type="xml">
+            <tree string="stock.multishipping">
+                <field name="name"/>
+                <field name="x_picking_id" invisible="True"/>
+                <field name="x_partner_id"/>
+                <field name="x_address_id"/>
+                <field name="x_product_lines"/>
+            </tree>
+        </field>
+    </record>
+
+    <record model="ir.actions.act_window" id="action_stock_multishipping">
+        <field name="name">Stock Multishipping</field>
+        <field name="res_model">stock.multishipping</field>
+        <field name="view_mode">form,tree</field>
+    </record>
+
+<!--    <menuitem id="menu_stock_multishipping" name="Α.Α.Δ.Ε Invoices"-->
+<!--              parent="account.menu_finance_entries"-->
+<!--              action="action_stock_multishipping" sequence="999"/>-->
+
+</odoo>

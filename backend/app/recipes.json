@@ -1,0 +1,136 @@
+{
+    "cookies": {
+      "productType": "cookies",
+      "steps": [
+        {
+          "name": "mixing",
+          "duration": 25,
+          "requiresHuman": true,
+          "requiresOven": false,
+          "requiresMixer": true,
+          "mustFollowImmediately": false,
+          "scalingFactor": 0.7
+        },
+        {
+          "name": "chilling",
+          "duration": 240,
+          "requiresHuman": false,
+          "requiresOven": false,
+          "requiresMixer": false,
+          "mustFollowImmediately": false
+        },
+        {
+          "name": "shaping",
+          "duration": 30,
+          "requiresHuman": true,
+          "requiresOven": false,
+          "requiresMixer": false,
+          "mustFollowImmediately": true
+        },
+        {
+          "name": "baking",
+          "duration": 15,
+          "requiresHuman": false,
+          "requiresOven": true,
+          "requiresMixer": false,
+          "mustFollowImmediately": true
+        }
+      ],
+      "requiresChilling": true,
+      "maxChillTime": 960,
+      "minBatchSize": 6,
+      "maxBatchSize": 24
+    },
+    "brownies": {
+      "productType": "brownies",
+      "steps": [
+        {
+          "name": "mixing",
+          "duration": 20,
+          "requiresHuman": true,
+          "requiresOven": false,
+          "requiresMixer": true,
+          "mustFollowImmediately": false,
+          "scalingFactor": 0.5
+        },
+        {
+          "name": "baking",
+          "duration": 35,
+          "requiresHuman": false,
+          "requiresOven": true,
+          "requiresMixer": false,
+          "mustFollowImmediately": true
+        },
+        {
+          "name": "cooling",
+          "duration": 120,
+          "requiresHuman": false,
+          "requiresOven": false,
+          "requiresMixer": false,
+          "mustFollowImmediately": true
+        }
+      ],
+      "requiresChilling": false,
+      "maxChillTime": 0,
+      "minBatchSize": 12,
+      "maxBatchSize": 36
+    },
+    "croissants": {
+      "productType": "croissants",
+      "steps": [
+        {
+          "name": "mixing",
+          "duration": 30,
+          "requiresHuman": true,
+          "requiresOven": false,
+          "requiresMixer": true,
+          "mustFollowImmediately": false,
+          "scalingFactor": 0.6
+        },
+        {
+          "name": "folding",
+          "duration": 45,
+          "requiresHuman": true,
+          "requiresOven": false,
+          "requiresMixer": false,
+          "mustFollowImmediately": true
+        },
+        {
+          "name": "chilling",
+          "duration": 360,
+          "requiresHuman": false,
+          "requiresOven": false,
+          "requiresMixer": false,
+          "mustFollowImmediately": false
+        },
+        {
+          "name": "shaping",
+          "duration": 40,
+          "requiresHuman": true,
+          "requiresOven": false,
+          "requiresMixer": false,
+          "mustFollowImmediately": true
+        },
+        {
+          "name": "proofing",
+          "duration": 120,
+          "requiresHuman": false,
+          "requiresOven": false,
+          "requiresMixer": false,
+          "mustFollowImmediately": true
+        },
+        {
+          "name": "baking",
+          "duration": 20,
+          "requiresHuman": false,
+          "requiresOven": true,
+          "requiresMixer": false,
+          "mustFollowImmediately": true
+        }
+      ],
+      "requiresChilling": true,
+      "maxChillTime": 1440,
+      "minBatchSize": 8,
+      "maxBatchSize": 24
+    }
+  }
