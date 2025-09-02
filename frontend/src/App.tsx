@@ -109,9 +109,25 @@ const App: React.FC = () => {
       <div className="px-5 view-container">
             {viewMode === 'gantt' ? (
               <>
-                <div className="mb-6">
-                  <h1 className="text-3xl font-bold text-foreground mb-2">Bakery Production Schedule</h1>
-                  <p className="text-muted-foreground">Daily baking and delivery timeline</p>
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h1 className="text-3xl font-bold text-foreground mb-2">Bakery Production Schedule</h1>
+                    <p className="text-muted-foreground">Daily baking and delivery timeline</p>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
+                      <Button variant="outline" size="sm">
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <span className="text-sm font-medium">{selectedDate}</span>
+                      <Button variant="outline" size="sm">
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <Button onClick={() => window.location.reload()} variant="outline" size="sm">
+                      Refresh
+                    </Button>
+                  </div>
                 </div>
                 <ConsolidatedScheduleView />
               </>
