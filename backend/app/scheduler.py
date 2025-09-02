@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class BakeryScheduler:
     def __init__(self, recipes_path: str = None):
-        self.recipes_path = recipes_path or Path(__file__).parent / 'recipes.json'
+        self.recipes_path = recipes_path or Path(__file__).parent.parent / 'data' / 'recipes.seed.json'
         self.recipes = self._load_recipes()
         self.orders = []
         self.schedule = []
